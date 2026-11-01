@@ -1,0 +1,1104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0c1117">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-512.png">
+<style>html{padding-block:env(safe-area-inset-top,0px) env(safe-area-inset-bottom,0px)}body{margin:0}</style>
+<title>Bee Airlines EFB</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bee EFB">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: mounted-iPad cockpit EFB. Fixed nav rail left, status bar top, one working view at a time. Dark-first. */
+:root{
+  --bg:#0c1117; --panel:#131a22; --panel-2:#19222d; --line:#263241; --line-2:#334255;
+  --fg:#e5ecf3; --muted:#8696aa; --dim:#5d6c7f;
+  --honey:#f4b52c; --honey-ink:#1a1204; --honey-soft:rgba(244,181,44,.14);
+  --cyan:#5fd4ea; --green:#3fd68a; --green-soft:rgba(63,214,138,.12);
+  --amber:#ffae42; --red:#ff6161; --red-soft:rgba(255,97,97,.13); --magenta:#e07ae6;
+  --rwy:#5b6880; --rwy-mark:#e5ecf3; --twy:#2b3a4a; --twy-cl:#c9a227; --apron:#18212b; --bldg:#26303c;
+  --paper:#161e27; --paper-line:#253140; --shadow:0 10px 30px rgba(0,0,0,.35);
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --r:14px; --rail:104px; --top:68px;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){
+  --bg:#e9eef3; --panel:#ffffff; --panel-2:#f3f6f9; --line:#d4dce5; --line-2:#bcc8d5;
+  --fg:#111a24; --muted:#556477; --dim:#7d8b9c;
+  --honey:#b67a00; --honey-ink:#ffffff; --honey-soft:rgba(182,122,0,.12);
+  --cyan:#00799a; --green:#0d8a52; --green-soft:rgba(13,138,82,.10);
+  --amber:#b65f00; --red:#c62b2b; --red-soft:rgba(198,43,43,.09); --magenta:#a2289f;
+  --rwy:#4a5463; --rwy-mark:#ffffff; --twy:#c4ccd6; --twy-cl:#b08600; --apron:#dde3ea; --bldg:#b9c3cf;
+  --paper:#fffef9; --paper-line:#d9e2ec; --shadow:0 8px 24px rgba(20,40,60,.10);
+  color-scheme:light;
+}}
+:root[data-theme="light"]{
+  --bg:#e9eef3; --panel:#ffffff; --panel-2:#f3f6f9; --line:#d4dce5; --line-2:#bcc8d5;
+  --fg:#111a24; --muted:#556477; --dim:#7d8b9c;
+  --honey:#b67a00; --honey-ink:#ffffff; --honey-soft:rgba(182,122,0,.12);
+  --cyan:#00799a; --green:#0d8a52; --green-soft:rgba(13,138,82,.10);
+  --amber:#b65f00; --red:#c62b2b; --red-soft:rgba(198,43,43,.09); --magenta:#a2289f;
+  --rwy:#4a5463; --rwy-mark:#ffffff; --twy:#c4ccd6; --twy-cl:#b08600; --apron:#dde3ea; --bldg:#b9c3cf;
+  --paper:#fffef9; --paper-line:#d9e2ec; --shadow:0 8px 24px rgba(20,40,60,.10);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.4;overflow:hidden;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea,select{-webkit-user-select:text;user-select:text}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+a{color:var(--cyan)}
+:focus-visible{outline:2px solid var(--honey);outline-offset:2px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+.app{display:grid;grid-template-columns:var(--rail) 1fr;grid-template-rows:var(--top) 1fr;height:100%}
+.app.focus{grid-template-columns:0 1fr}
+.app.focus .rail{display:none}
+.top{grid-column:1/3;display:flex;align-items:center;gap:16px;background:var(--panel);border-bottom:1px solid var(--line);padding-block:0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));min-width:0}
+.brand{display:flex;align-items:center;gap:10px;flex:none}
+.brand svg{width:38px;height:38px}
+.brand b{font-family:var(--f-display);font-weight:700;font-size:22px;letter-spacing:.04em;line-height:1}
+.brand small{display:block;font-family:var(--f-display);font-size:12px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase}
+.fltchip{display:flex;align-items:center;gap:12px;padding:6px 14px;border:1px solid var(--line);border-radius:999px;background:var(--panel-2);min-width:0;overflow:hidden}
+.fltchip .no{font-family:var(--f-display);font-weight:700;font-size:20px;color:var(--honey);letter-spacing:.04em}
+.fltchip .rt{font-family:var(--f-mono);font-size:15px;white-space:nowrap}
+.fltchip .ac{font-family:var(--f-display);font-size:14px;color:var(--muted);letter-spacing:.08em;white-space:nowrap}
+.spacer{flex:1}
+.clocks{display:flex;gap:6px;flex:none}
+.clk{display:flex;flex-direction:column;align-items:flex-end;line-height:1;padding:4px 10px;border-radius:10px}
+.clk .t{font-family:var(--f-mono);font-size:26px;font-weight:600;letter-spacing:.01em}
+.clk .z{font-family:var(--f-display);font-size:12px;color:var(--muted);letter-spacing:.14em;margin-top:3px}
+.clk.utc .t{color:var(--cyan)}
+.clk.lcl{border-left:1px solid var(--line)}
+.tbtn{height:44px;min-width:44px;padding:0 12px;display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);border-radius:12px;background:var(--panel-2);font-family:var(--f-display);font-size:15px;letter-spacing:.06em;color:var(--muted);flex:none}
+.tbtn svg{width:20px;height:20px}
+.tbtn[aria-pressed="true"]{color:var(--honey);border-color:var(--honey);background:var(--honey-soft)}
+
+.rail{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;gap:4px;padding:10px 8px;padding-left:max(8px,env(safe-area-inset-left,0px));overflow-y:auto}
+.nav{display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 4px;border-radius:14px;color:var(--muted);font-family:var(--f-display);font-size:14px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;position:relative}
+.nav svg{width:30px;height:30px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.nav[aria-current="page"]{color:var(--honey);background:var(--honey-soft)}
+.nav .badge{position:absolute;top:8px;right:14px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--honey);color:var(--honey-ink);font-family:var(--f-mono);font-size:11px;display:flex;align-items:center;justify-content:center}
+.rail .foot{margin-top:auto;text-align:center;font-family:var(--f-display);font-size:11px;color:var(--dim);letter-spacing:.1em;padding:8px 0}
+
+main{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-block:20px 40px;padding-left:20px;padding-right:max(20px,env(safe-area-inset-right,0px));min-width:0}
+.view{display:flex;flex-direction:column;gap:18px;max-width:1400px;margin:0 auto}
+.vhead{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.vhead h1{font-family:var(--f-display);font-weight:700;font-size:34px;letter-spacing:.03em;margin:0;line-height:1;text-wrap:balance}
+.vhead p{margin:0;color:var(--muted);font-size:15px}
+.grid{display:grid;gap:18px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;min-width:0;display:flex;flex-direction:column;gap:14px}
+.card h2{margin:0;font-family:var(--f-display);font-size:15px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:10px}
+.card h2 .r{margin-left:auto;display:flex;gap:8px}
+.lbl{font-family:var(--f-display);font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px}
+.f{display:flex;flex-direction:column;gap:5px;min-width:0}
+.f input,.f select,.inp{height:52px;width:100%;border-radius:11px;border:1px solid var(--line-2);background:var(--panel-2);color:var(--fg);font-family:var(--f-mono);font-size:20px;padding:0 12px;text-transform:uppercase}
+.ta{min-height:110px;padding:12px;font-size:17px;line-height:1.45;resize:vertical;width:100%;border-radius:11px;border:1px solid var(--line-2);background:var(--panel-2);color:var(--fg);font-family:var(--f-mono)}
+.f input:focus,.f select:focus,.ta:focus,.inp:focus{outline:none;border-color:var(--honey);box-shadow:0 0 0 3px var(--honey-soft)}
+.btn{height:52px;padding:0 20px;border-radius:12px;background:var(--panel-2);border:1px solid var(--line-2);font-family:var(--f-display);font-size:17px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btn.pri{background:var(--honey);border-color:var(--honey);color:var(--honey-ink)}
+.btn.sm{height:42px;padding:0 14px;font-size:15px}
+.btn.ghost{background:none}
+.btn.danger{color:var(--red);border-color:var(--red)}
+.btn[aria-pressed="true"]{border-color:var(--honey);color:var(--honey);background:var(--honey-soft)}
+.btn:active{transform:scale(.98)}
+.seg{display:inline-flex;padding:4px;border-radius:13px;background:var(--panel-2);border:1px solid var(--line);gap:4px;flex-wrap:wrap}
+.seg button{height:44px;padding:0 18px;border-radius:10px;font-family:var(--f-display);font-weight:600;font-size:17px;letter-spacing:.06em;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--honey);color:var(--honey-ink)}
+.pill{display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:999px;font-family:var(--f-display);font-weight:700;font-size:13px;letter-spacing:.1em;border:1px solid currentColor}
+.c-vfr{color:var(--green)} .c-mvfr{color:var(--cyan)} .c-ifr{color:var(--red)} .c-lifr{color:var(--magenta)}
+.note{font-size:13px;color:var(--dim)}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+
+/* flight */
+.ooo{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.oo{border:1px solid var(--line-2);border-radius:12px;padding:12px;background:var(--panel-2);text-align:left;display:flex;flex-direction:column;gap:4px;min-height:96px}
+.oo .k{font-family:var(--f-display);font-weight:700;font-size:20px;letter-spacing:.12em;color:var(--muted)}
+.oo .v{font-family:var(--f-mono);font-size:26px;color:var(--dim)}
+.oo.set{border-color:var(--cyan)} .oo.set .v{color:var(--cyan)} .oo.set .k{color:var(--fg)}
+.oo.next{border-color:var(--honey);box-shadow:inset 0 0 0 1px var(--honey)} .oo.next .k{color:var(--honey)}
+.tot{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{display:flex;flex-direction:column;gap:2px}
+.stat .v{font-family:var(--f-mono);font-size:30px;font-weight:600;font-variant-numeric:tabular-nums}
+.stat .v small{font-size:15px;color:var(--muted);font-weight:400}
+.route{display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center}
+.route .ap b{display:block;font-family:var(--f-display);font-weight:700;font-size:44px;letter-spacing:.04em;line-height:1}
+.route .ap span{font-size:14px;color:var(--muted)}
+.route .ap.r{text-align:right}
+.route .line svg{width:100%;height:40px;overflow:visible}
+.clprog{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.clp{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:11px;border:1px solid var(--line);background:var(--panel-2);text-align:left}
+.clp span{font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:.06em;text-transform:uppercase}
+.clp i{display:block;height:5px;border-radius:3px;background:var(--line)}
+.clp i b{display:block;height:100%;border-radius:3px;background:var(--honey)}
+.clp.done{border-color:var(--green)} .clp.done span{color:var(--green)} .clp.done i b{background:var(--green)}
+.chrono .v{font-family:var(--f-mono);font-size:54px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+
+/* checklists */
+.cl-wrap{display:grid;grid-template-columns:300px minmax(0,1fr);gap:18px;align-items:start}
+.cl-list{display:flex;flex-direction:column;gap:4px}
+.cl-group{font-family:var(--f-display);font-size:12px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;padding:12px 6px 4px}
+.cl-it{display:flex;align-items:center;gap:10px;min-height:52px;padding:0 14px;border-radius:11px;text-align:left;font-family:var(--f-display);font-weight:600;font-size:18px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.cl-it .n{margin-left:auto;font-family:var(--f-mono);font-size:13px;font-weight:400}
+.cl-it[aria-current="true"]{background:var(--panel);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line-2)}
+.cl-it.done{color:var(--green)}
+.cl-it .dot{width:10px;height:10px;border-radius:50%;border:2px solid currentColor;flex:none}
+.cl-it.done .dot{background:var(--green)}
+.ecl{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.ecl-h{display:flex;align-items:center;gap:14px;padding:16px 20px;border-bottom:1px solid var(--line);background:var(--panel-2);flex-wrap:wrap}
+.ecl-h h2{margin:0;font-family:var(--f-display);font-weight:700;font-size:28px;letter-spacing:.06em;text-transform:uppercase}
+.ecl-h .tag{font-family:var(--f-display);font-size:13px;letter-spacing:.14em;color:var(--cyan);text-transform:uppercase}
+.ci{display:flex;align-items:center;gap:16px;min-height:68px;padding:10px 20px;border-bottom:1px solid var(--line);text-align:left;width:100%}
+.ci .box{width:30px;height:30px;border-radius:8px;border:2px solid var(--line-2);flex:none;display:flex;align-items:center;justify-content:center}
+.ci .box svg{width:20px;height:20px;stroke:var(--bg);stroke-width:3.2;fill:none;opacity:0}
+.ci .ch{font-family:var(--f-display);font-weight:600;font-size:22px;letter-spacing:.04em;text-transform:uppercase}
+.ci .lead{flex:1;border-bottom:2px dotted var(--line-2);min-width:20px;transform:translateY(-6px)}
+.ci .rs{font-family:var(--f-display);font-weight:600;font-size:22px;letter-spacing:.04em;text-transform:uppercase;color:var(--cyan);text-align:right}
+.ci .sub{display:block;font-size:16px;color:var(--muted);letter-spacing:.06em}
+.ci .who{font-family:var(--f-mono);font-size:12px;color:var(--dim);width:42px;text-align:right;flex:none}
+.ci.cur{background:var(--honey-soft);box-shadow:inset 4px 0 0 var(--honey)}
+.ci.cur .box{border-color:var(--honey)}
+.ci.ok .box{background:var(--green);border-color:var(--green)}
+.ci.ok .box svg{opacity:1}
+.ci.ok .ch,.ci.ok .rs{color:var(--green)}
+.ci.mem .rs{color:var(--amber)}
+.ce{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 90px 44px;gap:8px;padding:8px 20px;border-bottom:1px solid var(--line)}
+.ce input,.ce select{height:46px;border-radius:9px;border:1px solid var(--line-2);background:var(--panel-2);color:var(--fg);font-family:var(--f-display);font-size:18px;padding:0 10px;text-transform:uppercase;min-width:0}
+.ecl-f{display:flex;gap:12px;padding:16px 20px;align-items:center;flex-wrap:wrap}
+.complete{font-family:var(--f-display);font-weight:700;font-size:22px;letter-spacing:.1em;color:var(--green);text-transform:uppercase}
+.warnstrip{display:flex;gap:10px;align-items:center;padding:10px 20px;background:var(--red-soft);color:var(--red);font-family:var(--f-display);font-size:14px;letter-spacing:.1em;text-transform:uppercase}
+
+/* charts */
+.apchips{display:flex;gap:8px;flex-wrap:wrap}
+.apc{height:48px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--panel);font-family:var(--f-mono);font-size:18px;font-weight:600;display:inline-flex;align-items:center;gap:8px}
+.apc small{font-family:var(--f-display);font-size:12px;letter-spacing:.12em;color:var(--muted);font-weight:600}
+.apc[aria-pressed="true"]{border-color:var(--honey);color:var(--honey);background:var(--honey-soft)}
+.osm{position:relative;height:calc(100vh - 300px);min-height:440px;overflow:auto;background:var(--apron);border-radius:12px;border:1px solid var(--line);-webkit-overflow-scrolling:touch}
+.osm svg{display:block}
+.osm .lbl-tw rect{fill:#111}
+.osm .lbl-tw text{fill:#f6d23a;font-family:"Barlow Condensed",sans-serif;font-weight:700}
+.osm .lbl-st text{fill:var(--muted);font-family:"JetBrains Mono",monospace}
+.osm .lbl-hp text{fill:var(--red);font-family:"Barlow Condensed",sans-serif;font-weight:700}
+.osm-legend{position:sticky;left:12px;bottom:12px;float:left;margin-top:-60px}
+.tbl{width:100%;border-collapse:collapse;font-size:16px}
+.tbl th{font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+.tbl td{padding:11px 10px;border-bottom:1px solid var(--line);font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.tbl td.t{font-family:var(--f-body)}
+.tbl tr.best td{background:var(--green-soft)}
+.tblwrap{overflow-x:auto}
+.hw{color:var(--green)} .tw{color:var(--red)} .xw{color:var(--amber)}
+.split{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px}
+.split-l{display:grid;grid-template-columns:300px minmax(0,1fr);gap:18px}
+.chlist{display:flex;flex-direction:column;gap:6px;max-height:calc(100vh - 330px);overflow:auto}
+.chit{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:11px;border:1px solid var(--line);background:var(--panel-2);text-align:left;min-height:56px;width:100%}
+.chit[aria-current="true"]{border-color:var(--honey);background:var(--honey-soft)}
+.chit .cat{font-family:var(--f-display);font-size:12px;font-weight:700;letter-spacing:.12em;color:var(--cyan);width:46px;flex:none}
+.chit .nm{font-size:15px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.chit .nm small{display:block;font-family:var(--f-mono);font-size:12px;color:var(--dim)}
+.chit .x{color:var(--dim);width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:8px;flex:none}
+.chit .x svg{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none}
+.srcs{display:flex;flex-direction:column;gap:6px;font-size:14px}
+
+/* ink documents */
+.doc{display:flex;flex-direction:column;gap:10px;min-width:0}
+.inkbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px;border-radius:14px;background:var(--panel);border:1px solid var(--line);position:sticky;top:-20px;z-index:5}
+.inkbar .sep{width:1px;height:30px;background:var(--line)}
+.tool{height:46px;min-width:46px;padding:0 12px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px solid transparent}
+.tool svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tool[aria-pressed="true"]{color:var(--honey);background:var(--honey-soft);border-color:var(--honey)}
+.sw{width:34px;height:34px;border-radius:50%;border:3px solid var(--panel);box-shadow:0 0 0 1px var(--line-2);flex:none}
+.sw[aria-pressed="true"]{box-shadow:0 0 0 3px var(--honey)}
+.docpages{position:relative;height:calc(100vh - 250px);min-height:420px;overflow:auto;background:var(--panel-2);border-radius:12px;border:1px solid var(--line);-webkit-overflow-scrolling:touch}
+.docin{transform-origin:0 0;display:flex;flex-direction:column;gap:14px;align-items:center;padding:14px}
+.pg{position:relative;box-shadow:var(--shadow);background:#fff;flex:none}
+.pg canvas{position:absolute;left:0;top:0;display:block}
+.pg canvas.ink{touch-action:pan-x pan-y}
+.pg .pno{position:absolute;right:8px;bottom:6px;font-family:var(--f-mono);font-size:11px;color:#8a96a3;pointer-events:none}
+.docpages.night .pg canvas.base{filter:invert(1) hue-rotate(180deg) brightness(.9)}
+.docpages.night .pg{background:#111}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;color:var(--muted);padding:40px 20px;min-height:100%}
+.empty svg{width:56px;height:56px;stroke:var(--dim);fill:none;stroke-width:1.4}
+.empty b{color:var(--fg);font-size:18px}
+
+/* weather */
+.wxtiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.wt{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.wt .v{font-family:var(--f-mono);font-size:26px;font-weight:600;line-height:1.15;overflow-wrap:anywhere}
+.wt .s{font-size:13px;color:var(--muted)}
+.raw{font-family:var(--f-mono);font-size:18px;line-height:1.5;padding:14px 16px;border-radius:12px;background:var(--panel-2);border:1px solid var(--line);overflow-wrap:anywhere;-webkit-user-select:text;user-select:text}
+.windrose{width:150px;height:150px;flex:none}
+.live{display:inline-flex;align-items:center;gap:6px}
+.live i{width:9px;height:9px;border-radius:50%;background:var(--dim)}
+.live.on i{background:var(--green);box-shadow:0 0 0 4px var(--green-soft)}
+
+/* perf */
+.lim{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.lim div{background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:10px 12px}
+.lim b{display:block;font-family:var(--f-mono);font-size:20px;font-weight:600;color:var(--cyan)}
+.lim span{font-family:var(--f-display);font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.res{font-family:var(--f-mono);font-size:24px;font-weight:600;color:var(--cyan)}
+.res small{display:block;font-family:var(--f-body);font-size:13px;color:var(--muted);font-weight:400}
+
+.dimmer{position:fixed;inset:0;background:#000;pointer-events:none;z-index:50;opacity:0}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(30px);opacity:0;background:var(--fg);color:var(--bg);font-family:var(--f-display);font-weight:600;letter-spacing:.06em;padding:12px 20px;border-radius:12px;z-index:60;transition:.25s;pointer-events:none}
+.toast.on{opacity:1;transform:translateX(-50%)}
+.pop{position:absolute;top:calc(var(--top) + 6px);right:max(16px,env(safe-area-inset-right,0px));background:var(--panel);border:1px solid var(--line-2);border-radius:14px;padding:16px;box-shadow:var(--shadow);z-index:40;width:300px;display:flex;flex-direction:column;gap:12px}
+.pop input[type=range]{width:100%;accent-color:var(--honey);height:34px}
+.disclaim{font-size:12px;color:var(--dim);border-top:1px solid var(--line);padding-top:12px}
+
+@media (max-width:1180px){
+  .g3{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .wxtiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .brand div{display:none}
+  .split-l{grid-template-columns:250px minmax(0,1fr)}
+  .split{grid-template-columns:minmax(0,1fr) 300px}
+}
+@media (max-width:900px){
+  .g2,.g3,.cl-wrap,.split,.split-l{grid-template-columns:minmax(0,1fr)}
+  .cl-list{flex-direction:row;overflow-x:auto}
+  .cl-group{display:none}
+  .cl-it{flex:none}
+  .fltchip{display:none}
+  .chlist{max-height:240px}
+}
+@media (max-width:640px){
+  :root{--rail:0px;--top:60px}
+  .app{grid-template-columns:1fr;grid-template-rows:var(--top) 1fr auto}
+  .rail{grid-row:3;flex-direction:row;border-right:0;border-top:1px solid var(--line);padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));overflow-x:auto}
+  .rail .foot{display:none}
+  .nav{flex:1;padding:8px 6px;font-size:11px;min-width:58px}
+  .nav svg{width:24px;height:24px}
+  main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .clk .t{font-size:18px}
+  .tbtn span{display:none}
+  .ooo,.tot{grid-template-columns:repeat(2,1fr)}
+  .ci .ch,.ci .rs{font-size:17px}
+  .ci .who{display:none}
+  .route .ap b{font-size:30px}
+  .ce{grid-template-columns:1fr 1fr}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-flight" viewBox="0 0 32 32"><path d="M4 18l8-1 6-10h3l-2 10 7-1 2-3h2l-1 5 1 5h-2l-2-3-7-1 2 10h-3l-6-10-8-1z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 32 32"><rect x="6" y="5" width="20" height="24" rx="3"/><path d="M12 5V3h8v2M10 13l2 2 4-4M10 21l2 2 4-4M19 14h4M19 22h4"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 32 32"><path d="M4 7l8-3 8 3 8-3v21l-8 3-8-3-8 3zM12 4v21M20 7v21"/></symbol>
+  <symbol id="i-atc" viewBox="0 0 32 32"><path d="M16 14v14M12 28h8M10 10a8 8 0 0112 0M7 7a12 12 0 0118 0"/><circle cx="16" cy="13" r="2"/></symbol>
+  <symbol id="i-wx" viewBox="0 0 32 32"><path d="M9 22a6 6 0 01.6-12A8 8 0 0125 12a5 5 0 01-1 10zM12 26l-1 3M17 26l-1 3M22 26l-1 3"/></symbol>
+  <symbol id="i-perf" viewBox="0 0 32 32"><path d="M5 22a11 11 0 1122 0"/><path d="M16 22l6-8"/><circle cx="16" cy="22" r="2"/><path d="M5 27h22"/></symbol>
+  <symbol id="i-notes" viewBox="0 0 32 32"><path d="M7 4h14l5 5v19H7zM21 4v5h5M11 15h10M11 20h10M11 25h6"/></symbol>
+  <symbol id="i-tick" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20l1-5L16 4l4 4L9 19z M14 6l4 4"/></symbol>
+  <symbol id="i-hl" viewBox="0 0 24 24"><path d="M9 14l-4 6h6l1-2M9 14l7-10 4 3-7 10z"/></symbol>
+  <symbol id="i-er" viewBox="0 0 24 24"><path d="M8 20h12M5 15l9-10 6 6-8 9H9z"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 7L4 12l5 5M4 12h10a6 6 0 010 12h-2" transform="translate(0,-4)"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 13V5a1.5 1.5 0 013 0v6M11 11V4a1.5 1.5 0 013 0v7M14 11V6a1.5 1.5 0 013 0v8c0 4-3 7-6.5 7S5 18 4 15l-1-3a1.5 1.5 0 012.6-1.4L8 13"/></symbol>
+  <symbol id="i-full" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+</svg>
+
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true">
+        <path d="M20 2l16 9v18l-16 9-16-9V11z" fill="var(--honey)"/>
+        <path d="M13 17c0-4 3-7 7-7s7 3 7 7v6c0 4-3 7-7 7s-7-3-7-7z" fill="var(--honey-ink)"/>
+        <path d="M13 19h14M13 24h14" stroke="var(--honey)" stroke-width="2.4"/>
+        <path d="M20 10c-1-3-3-5-6-5M20 10c1-3 3-5 6-5" stroke="var(--honey-ink)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+      </svg>
+      <div><b>BEE AIRLINES</b><small>Flight Bag</small></div>
+    </div>
+    <div class="fltchip"><span class="no" id="chipNo">BEE1</span><span class="rt" id="chipRt">LHBP → KJFK</span><span class="ac" id="chipAc">A350-900</span></div>
+    <div class="spacer"></div>
+    <div class="clocks">
+      <div class="clk utc"><span class="t" id="utc">00:00:00</span><span class="z">UTC · ZULU</span></div>
+      <div class="clk lcl"><span class="t" id="lcl">00:00</span><span class="z" id="lclZ">LOCAL</span></div>
+    </div>
+    <button class="tbtn" id="btnWake" aria-pressed="false" title="Keep screen awake"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg><span>AWAKE</span></button>
+    <button class="tbtn" id="btnDisp" aria-expanded="false" title="Display"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 13A9 9 0 1111 3a7 7 0 0010 10z"/></svg><span>DISPLAY</span></button>
+  </header>
+
+  <nav class="rail" aria-label="Sections">
+    <button class="nav" data-v="flight"><svg><use href="#i-flight"/></svg>Flight</button>
+    <button class="nav" data-v="check"><svg><use href="#i-check"/></svg>Checklist<span class="badge" id="clBadge" hidden></span></button>
+    <button class="nav" data-v="charts"><svg><use href="#i-chart"/></svg>Charts</button>
+    <button class="nav" data-v="atc"><svg><use href="#i-atc"/></svg>ATC</button>
+    <button class="nav" data-v="wx"><svg><use href="#i-wx"/></svg>Weather</button>
+    <button class="nav" data-v="perf"><svg><use href="#i-perf"/></svg>Perf</button>
+    <button class="nav" data-v="notes"><svg><use href="#i-notes"/></svg>Notes</button>
+    <div class="foot">SIM / TRAINING<br>v2.0</div>
+  </nav>
+
+  <main id="main">
+    <!-- FLIGHT -->
+    <section class="view" id="v-flight">
+      <div class="vhead"><h1>Flight overview</h1><p>Set up the flight, then work the phases left to right.</p></div>
+      <div class="card">
+        <div class="route">
+          <div class="ap"><b id="rDep">LHBP</b><span id="rDepN">Budapest</span></div>
+          <div class="line"><svg viewBox="0 0 400 40" preserveAspectRatio="none" aria-hidden="true"><path d="M4 32 Q200 -14 396 32" fill="none" stroke="var(--line-2)" stroke-width="2" stroke-dasharray="6 6" vector-effect="non-scaling-stroke"/><circle id="rDot" cx="4" cy="32" r="6" fill="var(--honey)"/></svg></div>
+          <div class="ap r"><b id="rArr">KJFK</b><span id="rArrN">New York</span></div>
+        </div>
+        <div class="tot">
+          <div class="stat"><span class="lbl">Great circle</span><span class="v" id="rDist">—</span></div>
+          <div class="stat"><span class="lbl">Est. air time</span><span class="v" id="rEte">—</span></div>
+          <div class="stat"><span class="lbl">Phase</span><span class="v" id="rPhase" style="color:var(--honey)">PREFLIGHT</span></div>
+        </div>
+      </div>
+      <div class="grid g2">
+        <div class="card">
+          <h2>Flight setup</h2>
+          <div class="seg" id="acSeg" role="group" aria-label="Aircraft type"><button data-ac="A21N">A321LR</button><button data-ac="A359">A350-900</button></div>
+          <div class="fields">
+            <div class="f"><label class="lbl" for="f-no">Flight no</label><input id="f-no" data-k="flight.no" maxlength="8"></div>
+            <div class="f"><label class="lbl" for="f-reg">Registration</label><input id="f-reg" data-k="flight.reg" list="regs" maxlength="8"></div>
+            <div class="f"><label class="lbl" for="f-dep">From</label><input id="f-dep" data-k="flight.dep" maxlength="4"></div>
+            <div class="f"><label class="lbl" for="f-arr">To</label><input id="f-arr" data-k="flight.arr" maxlength="4"></div>
+            <div class="f"><label class="lbl" for="f-alt">Alternate</label><input id="f-alt" data-k="flight.alt" maxlength="4"></div>
+            <div class="f"><label class="lbl" for="f-etd">STD (UTC)</label><input id="f-etd" data-k="flight.std" maxlength="5" inputmode="numeric" placeholder="HHMM"></div>
+            <div class="f"><label class="lbl" for="f-fl">Cruise FL</label><input id="f-fl" data-k="flight.fl" maxlength="3" inputmode="numeric"></div>
+            <div class="f"><label class="lbl" for="f-ci">Cost index</label><input id="f-ci" data-k="flight.ci" maxlength="3" inputmode="numeric"></div>
+            <div class="f"><label class="lbl" for="f-pax">PAX</label><input id="f-pax" data-k="flight.pax" maxlength="3" inputmode="numeric"></div>
+            <div class="f"><label class="lbl" for="f-fob">Block fuel kg</label><input id="f-fob" data-k="flight.fuel" maxlength="6" inputmode="numeric"></div>
+            <div class="f"><label class="lbl" for="f-zfw">ZFW kg</label><input id="f-zfw" data-k="flight.zfw" maxlength="6" inputmode="numeric"></div>
+            <div class="f"><label class="lbl" for="f-tow">TOW kg</label><input id="f-tow" readonly tabindex="-1"></div>
+          </div>
+          <datalist id="regs"></datalist>
+          <div class="note" id="wtWarn"></div>
+        </div>
+        <div class="card">
+          <h2>Takeoff &amp; landing data <span class="r note" style="letter-spacing:0;text-transform:none">Feeds the checklists</span></h2>
+          <div class="fields">
+            <div class="f"><label class="lbl" for="t-rwy">T/O runway</label><input id="t-rwy" data-k="perf.torwy" maxlength="4"></div>
+            <div class="f"><label class="lbl" for="t-flp">T/O flaps</label><select id="t-flp" data-k="perf.flaps"><option>1</option><option>2</option><option>3</option></select></div>
+            <div class="f"><label class="lbl" for="t-thr">Thrust</label><input id="t-thr" data-k="perf.thr" maxlength="6" placeholder="FLX 54"></div>
+            <div class="f"><label class="lbl" for="t-trim">THS trim</label><input id="t-trim" data-k="perf.trim" maxlength="6" placeholder="UP0.8"></div>
+            <div class="f"><label class="lbl" for="t-v1">V1</label><input id="t-v1" data-k="perf.v1" maxlength="3" inputmode="numeric"></div>
+            <div class="f"><label class="lbl" for="t-vr">VR</label><input id="t-vr" data-k="perf.vr" maxlength="3" inputmode="numeric"></div>
+            <div class="f"><label class="lbl" for="t-v2">V2</label><input id="t-v2" data-k="perf.v2" maxlength="3" inputmode="numeric"></div>
+            <div class="f"><label class="lbl" for="t-ldg">LDG runway</label><input id="t-ldg" data-k="perf.ldgrwy" maxlength="4"></div>
+            <div class="f"><label class="lbl" for="t-vapp">VAPP</label><input id="t-vapp" data-k="perf.vapp" maxlength="3" inputmode="numeric"></div>
+            <div class="f"><label class="lbl" for="t-min">Minimum</label><input id="t-min" data-k="perf.mins" maxlength="8" placeholder="DA 213"></div>
+            <div class="f"><label class="lbl" for="t-ab">Autobrake</label><select id="t-ab" data-k="perf.ab"><option>LO</option><option>MED</option><option>HI</option><option>BTV</option><option>OFF</option></select></div>
+            <div class="f"><label class="lbl" for="t-qnh">Dest QNH</label><input id="t-qnh" data-k="perf.qnh" maxlength="5" inputmode="numeric"></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Block times <span class="r"><button class="btn sm ghost" id="ooReset">Reset times</button></span></h2>
+        <div class="ooo" id="ooo"></div>
+        <div class="tot">
+          <div class="stat"><span class="lbl">Block time</span><span class="v" id="tBlock">--:--</span></div>
+          <div class="stat"><span class="lbl">Air time</span><span class="v" id="tAir">--:--</span></div>
+          <div class="stat"><span class="lbl">Off-block vs STD</span><span class="v" id="tDelay">—</span></div>
+        </div>
+      </div>
+      <div class="grid g2">
+        <div class="card"><h2>Checklist progress <span class="r"><button class="btn sm ghost" data-go="check">Open</button></span></h2><div class="clprog" id="clProg"></div></div>
+        <div class="card chrono"><h2>Chrono</h2><div class="v" id="chrV">00:00.0</div>
+          <div class="row"><button class="btn pri" id="chrGo">Start</button><button class="btn" id="chrRst">Reset</button><span class="note">Holding legs, timed approaches, engine cool-down.</span></div></div>
+      </div>
+    </section>
+
+    <!-- CHECKLISTS -->
+    <section class="view" id="v-check" hidden>
+      <div class="vhead"><h1>Checklists</h1><p id="clSub"></p></div>
+      <div class="cl-wrap"><div class="cl-list" id="clList"></div><div class="ecl" id="ecl"></div></div>
+    </section>
+
+    <!-- CHARTS -->
+    <section class="view" id="v-charts" hidden>
+      <div class="vhead"><h1>Airports &amp; charts</h1><p id="apElev"></p></div>
+      <div class="apchips" id="apChips"></div>
+      <div class="seg" id="chTabs" role="group" aria-label="Chart view" style="align-self:flex-start">
+        <button data-t="diag" aria-pressed="true">Ground layout</button><button data-t="mine">Official charts</button><button data-t="info">Info</button>
+      </div>
+
+      <div id="ch-diag" class="split">
+        <div class="doc">
+          <div class="inkbar">
+            <button class="tool" id="osmOut" aria-label="Zoom out">−</button><span class="mono" id="osmZ" style="width:52px;text-align:center">100%</span><button class="tool" id="osmIn" aria-label="Zoom in">+</button><button class="tool" id="osmFit">Fit</button>
+            <span class="sep"></span>
+            <button class="tool" id="osmStands" aria-pressed="true">Stands</button><button class="tool" id="osmHold" aria-pressed="true">Hold points</button>
+            <span class="spacer"></span><span class="note">Pinch or + / − to zoom</span>
+          </div>
+          <div class="osm" id="osm"></div>
+          <div class="note">Ground layout from OpenStreetMap (© OpenStreetMap contributors, ODbL). Real taxiway geometry and names, not an approved chart.</div>
+        </div>
+        <div class="card">
+          <h2>Runways &amp; wind</h2>
+          <div class="tblwrap"><table class="tbl" id="rwyWind"></table></div>
+          <div class="note" id="rwyWindNote"></div>
+          <h2>Find taxiway / stand</h2>
+          <input class="inp" id="osmFind" placeholder="e.g. B or 31R" aria-label="Find taxiway or stand">
+          <div class="note" id="osmFindRes"></div>
+        </div>
+      </div>
+
+      <div id="ch-mine" class="split-l" hidden>
+        <div class="card">
+          <h2>Charts for <span id="chFor"></span></h2>
+          <div class="row">
+            <select class="inp" id="impCat" style="width:auto;flex:1;font-size:17px" aria-label="Chart category"><option value="APT">Airport</option><option value="SID">SID</option><option value="STAR">STAR</option><option value="IAP">Approach</option><option value="OTH">Other</option></select>
+            <label class="btn pri" for="impFile">Import</label>
+            <input type="file" id="impFile" accept="application/pdf,image/*" multiple hidden>
+          </div>
+          <div class="chlist" id="chList"></div>
+          <h2>Free official sources</h2>
+          <div class="srcs" id="chSrc"></div>
+        </div>
+        <div class="doc" id="chartDoc"></div>
+      </div>
+
+      <div id="ch-info" class="grid g2" hidden>
+        <div class="card"><h2>Frequencies</h2><div class="tblwrap"><table class="tbl" id="apFreq"></table></div><div class="note">Check against the current AIP and ATIS before use.</div></div>
+        <div class="card"><h2>Runways</h2><div class="tblwrap"><table class="tbl" id="apRwy"></table></div>
+          <h2>Ops notes</h2><textarea class="ta" id="apNote" placeholder="Stand, de-icing, local procedures…"></textarea></div>
+      </div>
+    </section>
+
+    <!-- ATC -->
+    <section class="view" id="v-atc" hidden>
+      <div class="vhead"><h1>ATC flight notes</h1><p>One copy of your ATC notes sheet per flight. Write on it with Apple Pencil.</p></div>
+      <div class="split-l" id="atcWrap">
+        <div class="card" id="atcSide">
+          <button class="btn pri" id="fltNew">New flight</button>
+          <h2>Saved flights</h2>
+          <div class="chlist" id="fltList"></div>
+          <h2>Notes sheet</h2>
+          <div class="note" id="tplInfo"></div>
+          <div class="row"><label class="btn sm" for="tplFile">Replace sheet PDF</label><input type="file" id="tplFile" accept="application/pdf,image/*" hidden></div>
+        </div>
+        <div class="doc" id="atcDoc"></div>
+      </div>
+    </section>
+
+    <!-- WEATHER -->
+    <section class="view" id="v-wx" hidden>
+      <div class="vhead"><h1>Weather</h1><p>Real METAR / TAF with decode and runway wind components.</p></div>
+      <div class="apchips" id="wxChips"></div>
+      <div class="card">
+        <div class="row">
+          <input class="inp" id="wxIcao" maxlength="4" style="width:130px" aria-label="ICAO code">
+          <button class="btn pri" id="wxFetch">Get live weather</button>
+          <button class="btn" id="wxDecode">Decode pasted</button>
+          <span class="live" id="wxLive"><i></i><span class="note" id="wxStat"></span></span>
+        </div>
+        <textarea class="ta" id="wxRaw" placeholder="Or paste a METAR, then the TAF on the next line…" style="min-height:80px;font-size:18px;text-transform:uppercase"></textarea>
+      </div>
+      <div class="split" style="grid-template-columns:minmax(0,1fr) 380px">
+        <div class="card">
+          <h2><span id="wxTitle">METAR</span> <span class="r" id="wxCat"></span></h2>
+          <div class="raw" id="wxMetar"></div>
+          <div class="wxtiles" id="wxTiles"></div>
+          <h2>TAF</h2>
+          <div class="raw" id="wxTaf" style="font-size:16px"></div>
+        </div>
+        <div class="card">
+          <h2>Wind on runways</h2>
+          <div class="row" style="justify-content:center"><svg class="windrose" id="rose" viewBox="0 0 150 150"></svg></div>
+          <div class="tblwrap"><table class="tbl" id="wxRwy"></table></div>
+          <div class="note" id="wxXwNote"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PERF -->
+    <section class="view" id="v-perf" hidden>
+      <div class="vhead"><h1>Performance &amp; tools</h1><p id="perfSub"></p></div>
+      <div class="card"><h2>Aircraft limitations <span class="r" id="limType" style="color:var(--honey)"></span></h2><div class="lim" id="lim"></div>
+        <div class="note">Published type figures for reference. Your operator's FCOM is the authority.</div></div>
+      <div class="grid g3">
+        <div class="card"><h2>Crosswind</h2>
+          <div class="fields" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+            <div class="f"><label class="lbl" for="x-rw">Rwy hdg</label><input id="x-rw" inputmode="numeric" maxlength="3" value="310"></div>
+            <div class="f"><label class="lbl" for="x-wd">Wind dir</label><input id="x-wd" inputmode="numeric" maxlength="3" value="270"></div>
+            <div class="f"><label class="lbl" for="x-ws">Speed kt</label><input id="x-ws" inputmode="numeric" maxlength="3" value="18"></div></div>
+          <div class="grid g2" style="gap:10px"><div class="res" id="x-h">—</div><div class="res" id="x-x">—</div></div></div>
+        <div class="card"><h2>Descent planner</h2>
+          <div class="fields" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+            <div class="f"><label class="lbl" for="d-fl">From FL</label><input id="d-fl" inputmode="numeric" maxlength="3" value="370"></div>
+            <div class="f"><label class="lbl" for="d-to">To ft</label><input id="d-to" inputmode="numeric" maxlength="5" value="3000"></div>
+            <div class="f"><label class="lbl" for="d-gs">GS kt</label><input id="d-gs" inputmode="numeric" maxlength="3" value="420"></div></div>
+          <div class="grid g2" style="gap:10px"><div class="res" id="d-d">—</div><div class="res" id="d-v">—</div></div></div>
+        <div class="card"><h2>Fuel</h2>
+          <div class="fields" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+            <div class="f"><label class="lbl" for="u-kg">Fuel kg</label><input id="u-kg" inputmode="numeric" maxlength="6" value="20000"></div>
+            <div class="f"><label class="lbl" for="u-sg">Density</label><input id="u-sg" inputmode="decimal" maxlength="5" value="0.800"></div></div>
+          <div class="grid g2" style="gap:10px"><div class="res" id="u-l">—</div><div class="res" id="u-lb">—</div></div></div>
+        <div class="card"><h2>Pressure</h2>
+          <div class="fields" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+            <div class="f"><label class="lbl" for="p-hpa">hPa</label><input id="p-hpa" inputmode="decimal" maxlength="6" value="1013"></div>
+            <div class="f"><label class="lbl" for="p-in">inHg</label><input id="p-in" inputmode="decimal" maxlength="5" value="29.92"></div></div>
+          <div class="note">Edit either field; the other follows.</div></div>
+        <div class="card"><h2>Temperature &amp; altitude</h2>
+          <div class="fields" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+            <div class="f"><label class="lbl" for="t-c">°C</label><input id="t-c" inputmode="numeric" maxlength="4" value="15"></div>
+            <div class="f"><label class="lbl" for="t-f">°F</label><input id="t-f" inputmode="numeric" maxlength="4" value="59"></div>
+            <div class="f"><label class="lbl" for="a-ft">Feet</label><input id="a-ft" inputmode="numeric" maxlength="6" value="1000"></div>
+            <div class="f"><label class="lbl" for="a-m">Metres</label><input id="a-m" inputmode="numeric" maxlength="6" value="305"></div></div></div>
+        <div class="card"><h2>Cold temp correction</h2>
+          <div class="fields" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+            <div class="f"><label class="lbl" for="k-h">Ht AAL ft</label><input id="k-h" inputmode="numeric" maxlength="5" value="1500"></div>
+            <div class="f"><label class="lbl" for="k-t">Aero OAT</label><input id="k-t" inputmode="numeric" maxlength="4" value="-20"></div>
+            <div class="f"><label class="lbl" for="k-e">Elev ft</label><input id="k-e" inputmode="numeric" maxlength="5" value="500"></div></div>
+          <div class="res" id="k-r">—</div></div>
+      </div>
+    </section>
+
+    <!-- NOTES -->
+    <section class="view" id="v-notes" hidden>
+      <div class="vhead"><h1>Notes</h1><p>A handwriting notebook. Write with Apple Pencil, scroll with your finger.</p></div>
+      <div class="split-l">
+        <div class="card">
+          <button class="btn pri" id="nNew">New notebook</button>
+          <div class="chlist" id="nList"></div>
+          <h2>This notebook</h2>
+          <input class="inp" id="nTitle" style="text-transform:none;font-family:var(--f-body);font-weight:600;font-size:18px" aria-label="Notebook title">
+          <div class="seg" id="nPaper" role="group" aria-label="Paper"><button data-p="lines">Lined</button><button data-p="grid">Grid</button><button data-p="blank">Blank</button></div>
+          <div class="row"><button class="btn sm" id="nAddPg">Add page</button><button class="btn sm danger" id="nDel">Delete</button></div>
+        </div>
+        <div class="doc" id="noteDoc"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="pop" id="pop" hidden>
+  <span class="lbl">Theme</span>
+  <div class="seg" id="themeSeg" role="group" aria-label="Theme"><button data-th="dark">Night</button><button data-th="light">Day</button></div>
+  <label class="lbl" for="dimR">Cockpit dimmer</label>
+  <input type="range" id="dimR" min="0" max="70" value="0">
+  <button class="btn sm danger" id="resetAll">Reset flight</button>
+  <div class="disclaim">Bee Airlines EFB is for flight simulation and training. It is not approved for operational use.</div>
+</div>
+<div class="dimmer" id="dimmer"></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="airports-osm.js"></script>
+<script>
+"use strict";
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const pad2=n=>String(n).padStart(2,"0");
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const toast=m=>{const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove("on"),2000)};
+const cssVar=n=>getComputedStyle(document.documentElement).getPropertyValue("--"+n).trim();
+
+/* ---------- reference data ---------- */
+const AC={
+  A21N:{name:"A321LR",regs:["HA-BZA","HA-BZB","HA-BZC","HA-BZD"],tas:450,xw:38,lim:[
+    ["MTOW","97 000 kg"],["MLW","79 200 kg"],["MZFW","75 600 kg"],["Max fuel (3 ACT)","≈ 25 900 kg"],
+    ["VMO / MMO","350 kt / M.82"],["Max altitude","39 800 ft"],["VFE CONF 1","230 kt"],["VFE 1+F","215 kt"],
+    ["VFE CONF 2","200 kt"],["VFE CONF 3","195 kt"],["VFE FULL","190 kt"],["VLO ext / ret","250 / 220 kt"],
+    ["VLE","280 kt / M.67"],["Max X-wind T/O-LDG","38 kt incl. gust"],["Max tailwind","15 kt"],["Tire speed","195 kt GS"]]},
+  A359:{name:"A350-900",regs:["HA-BYA","HA-BYB","HA-BYC"],tas:488,xw:40,lim:[
+    ["MTOW","283 000 kg"],["MLW","207 000 kg"],["MZFW","195 700 kg"],["Max fuel","≈ 110 500 kg"],
+    ["VMO / MMO","340 kt / M.89"],["Max altitude","43 100 ft"],["VFE CONF 1","255 kt"],["VFE 1+F","220 kt"],
+    ["VFE CONF 2","212 kt"],["VFE CONF 3","195 kt"],["VFE FULL","186 kt"],["VLO ext / ret","250 / 250 kt"],
+    ["VLE","280 kt / M.67"],["Max X-wind T/O-LDG","40 kt incl. gust"],["Max tailwind","15 kt"],["Tire speed","204 kt GS"]]}
+};
+const MTOW={A21N:97000,A359:283000};
+const APT={
+  LHBP:{n:"Budapest Liszt Ferenc",c:"Budapest",iata:"BUD",elev:495,lat:47.4369,lon:19.2556,tz:"Europe/Budapest",
+    rwy:[{id:"13L/31R",h:133,len:3707,w:45,x:650,y:690},{id:"13R/31L",h:133,len:3010,w:45,x:-650,y:-690}],
+    frq:[["ATIS","132.375"],["Delivery","121.700"],["Ground","121.900"],["Tower","118.100"],["Approach","129.700"]],
+    src:[["HungaroControl eAIP (AD 2 LHBP)","https://ais-en.hungarocontrol.hu/aip/"]],note:"Bee Airlines home base."},
+  EGLL:{n:"London Heathrow",c:"London",iata:"LHR",elev:83,lat:51.4700,lon:-0.4543,
+    rwy:[{id:"09L/27R",h:90,len:3902,w:50,x:0,y:700},{id:"09R/27L",h:90,len:3660,w:50,x:250,y:-700}],
+    frq:[["ATIS","128.075"],["Delivery","121.975"],["Ground","121.900"],["Tower","118.500"],["Director","119.725"]],
+    src:[["NATS UK AIP (AD 2 EGLL)","https://nats-uk.ead-it.com/cms-nats/opencms/en/Publications/AIP/"]],note:""},
+  EDDF:{n:"Frankfurt Main",c:"Frankfurt",iata:"FRA",elev:364,lat:50.0379,lon:8.5622,
+    rwy:[{id:"07C/25C",h:70,len:4000,w:60,x:0,y:0},{id:"07R/25L",h:70,len:4000,w:45,x:180,y:-490},{id:"07L/25R",h:70,len:2800,w:45,x:-3300,y:300},{id:"18",h:180,len:4000,w:45,x:-2700,y:-2600}],
+    frq:[["ATIS","118.025"],["Delivery","121.900"],["Ground","121.800"],["Tower","119.900"],["Approach","120.800"]],
+    src:[["DFS AIP (basic AIP, free)","https://aip.dfs.de/basicAIP/"]],note:"RWY 18 departures only."},
+  KJFK:{n:"New York John F. Kennedy",c:"New York",iata:"JFK",elev:13,lat:40.6413,lon:-73.7781,
+    rwy:[{id:"04L/22R",h:44,len:3682,w:61,x:-1700,y:300},{id:"04R/22L",h:44,len:2560,w:61,x:-300,y:-900},{id:"13L/31R",h:134,len:3048,w:61,x:900,y:-200},{id:"13R/31L",h:134,len:4423,w:61,x:-800,y:-1700}],
+    frq:[["ATIS","128.725"],["Clearance","135.050"],["Ground","121.900"],["Tower","119.100"],["Approach","132.400"]],
+    src:[["FAA d-TPP: KJFK airport diagram, SIDs, STARs, IAPs","https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/dtpp/search/results/?cycle=2511&ident=KJFK"]],note:""},
+  OMDB:{n:"Dubai International",c:"Dubai",iata:"DXB",elev:62,lat:25.2532,lon:55.3657,
+    rwy:[{id:"12L/30R",h:120,len:4351,w:60,x:100,y:180},{id:"12R/30L",h:120,len:4447,w:60,x:-100,y:-180}],
+    frq:[["ATIS","131.700"],["Delivery","120.350"],["Ground","118.350"],["Tower","118.750"],["Approach","124.900"]],
+    src:[["UAE GCAA eAIP","https://www.gcaa.gov.ae/en/ais/AIPHtmlFiles/AIP/Current/AIP.aspx"]],note:""},
+  LPPT:{n:"Lisbon Humberto Delgado",c:"Lisbon",iata:"LIS",elev:374,lat:38.7742,lon:-9.1342,
+    rwy:[{id:"02/20",h:22,len:3805,w:45,x:0,y:0},{id:"17/35",h:173,len:2400,w:45,x:150,y:700}],
+    frq:[["ATIS","124.150"],["Delivery","121.750"],["Ground","121.750"],["Tower","118.100"],["Approach","119.100"]],
+    src:[["NAV Portugal AIP","https://ais.nav.pt/online-eaip-en/"]],note:""}
+};
+
+/* Airbus Normal Checklist (FCOM PRO-NOR-NCL layout). [challenge, response, who, sub-items] */
+const CL_A21N=[
+  {id:"cp",t:"Cockpit prep",i:[["Gear pins & covers","Removed","PF"],["Fuel quantity","{fuel} KG","PF"],["Seat belts","On","BOTH"],["ADIRS","NAV","PF"],["Baro ref","{qnhdep} (BOTH)","BOTH"]]},
+  {id:"bs",t:"Before start",i:[["Parking brake","{pb}","PF"],["T.O speeds & thrust","{v1} {vr} {v2} {thr} (BOTH)","BOTH"],["Windows / doors","Closed (BOTH)","BOTH"],["Beacon","On","PF"]]},
+  {id:"as",t:"After start",i:[["Anti ice","{ai}","PF"],["ECAM status","Checked","PF"],["Pitch trim","{trim}","PF"],["Rudder trim","Zero","PF"]]},
+  {id:"tx",t:"Taxi",i:[["Flight controls","Checked (BOTH)","BOTH"],["Flap setting","CONF {flaps} (BOTH)","BOTH"],["Radar & pred W/S","On & auto","PF"],["Eng mode sel","{ems}","PF"],["ECAM memo","T.O no blue","PF","Auto brk max · Signs on · Cabin ready · Spoilers arm · Flaps T.O · T.O config normal"]]},
+  {id:"lu",t:"Line-up",i:[["T.O RWY","{torwy} (BOTH)","BOTH"],["TCAS","TA or TA/RA","PF"],["Packs 1 & 2","{packs}","PF"]]},
+  {id:"at",t:"After takeoff / climb",i:[["Landing gear","Up","PF"],["Flaps","Retracted","PF"],["Packs","On","PF"],["Baro ref","STD (BOTH)","BOTH","At transition altitude"]]},
+  {id:"ap",t:"Approach",i:[["Briefing","Confirmed","BOTH"],["ECAM status","Checked","PF"],["Seat belts","On","PF"],["Baro ref","{qnh} (BOTH)","BOTH"],["Minimum","{mins}","BOTH"],["Eng mode sel","{ems}","PF"]]},
+  {id:"ld",t:"Landing",i:[["ECAM memo","LDG no blue","PF","Ldg gear dn · Signs on · Cabin ready · Spoilers arm · Flaps set"]]},
+  {id:"al",t:"After landing",i:[["Radar & pred W/S","Off","PF"]]},
+  {id:"pk",t:"Parking",i:[["APU bleed","On","PF"],["Engines","Off","PF"],["Seat belts","Off","PF"],["Ext lt","{extlt}","PF"],["Fuel pumps","Off","PF"],["Park brk & chocks","{pbc}","PF"]]},
+  {id:"sc",t:"Securing the aircraft",i:[["Oxygen","Off","PF"],["Emer exit lt","Off","PF"],["EFBs","Off","BOTH"],["Batteries","Off","PF"]]}
+];
+const CL_A359=[
+  {id:"cp",t:"Cockpit prep",i:[["Gear pins & covers","Removed","PF"],["Signs","On / auto","PF"],["ADIRS","NAV","PF"],["Fuel quantity","{fuel} KG","PF"],["T.O data","Set","BOTH"],["Baro ref","{qnhdep} (BOTH)","BOTH"]]},
+  {id:"bs",t:"Before start",i:[["Parking brake","{pb}","PF"],["T.O speeds & thrust","{v1} {vr} {v2} {thr} (BOTH)","BOTH"],["Windows / doors","Closed (BOTH)","BOTH"],["Beacon","On","PF"]]},
+  {id:"as",t:"After start",i:[["Anti ice","{ai}","PF"],["ECAM status","Checked","PF"],["Pitch trim","{trim}","PF"]]},
+  {id:"tx",t:"Taxi",i:[["Flight controls","Checked (BOTH)","BOTH"],["Flaps setting","CONF {flaps} (BOTH)","BOTH"],["WXR / PWS","On & auto","PF"],["Eng start sel","{ems}","PF"],["ECAM T.O memo","No blue","PF","Auto brk RTO · Signs on · Cabin ready · Splrs arm · Flaps T.O · T.O config normal"]]},
+  {id:"lu",t:"Line-up",i:[["T.O RWY","{torwy} (BOTH)","BOTH"],["SURV / TCAS","TA or TA/RA","PF"],["Packs","{packs}","PF"]]},
+  {id:"at",t:"After takeoff / climb",i:[["Landing gear","Up","PF"],["Flaps","Retracted","PF"],["Packs","On","PF"],["Baro ref","STD (BOTH)","BOTH","At transition altitude"]]},
+  {id:"ap",t:"Approach",i:[["Briefing","Confirmed","BOTH"],["ECAM status","Checked","PF"],["Seat belts","On","PF"],["Baro ref","{qnh} (BOTH)","BOTH"],["Minimum","{mins}","BOTH"],["Auto brake / BTV","{ab}","PF"],["Eng start sel","{ems}","PF"]]},
+  {id:"ld",t:"Landing",i:[["ECAM LDG memo","No blue","PF","Ldg gear dn · Signs on · Cabin ready · Splrs arm · Flaps set"]]},
+  {id:"al",t:"After landing",i:[["WXR / PWS","Off","PF"]]},
+  {id:"pk",t:"Parking",i:[["APU bleed","On","PF"],["Engines","Off","PF"],["Seat belts","Off","PF"],["Ext lt","{extlt}","PF"],["Park brk & chocks","{pbc}","PF"]]},
+  {id:"sc",t:"Securing the aircraft",i:[["Oxygen","Off","PF"],["Emer exit lt","Off","PF"],["EFBs","Off","BOTH"],["Batteries","Off","PF"]]}
+];
+const BRIEF=[
+  {id:"tob",t:"Takeoff brief",i:[["Threats","Weather · NOTAM · terrain","PF"],["Runway / intersection","{torwy}","PF"],["Config & thrust","CONF {flaps} · {thr}","PF"],["Speeds","{v1} / {vr} / {v2}","PF"],["SID & initial alt","As cleared","PF"],["Engine failure","EO SID / straight ahead","PF"],["Rejected takeoff","Captain calls STOP","PF"]]},
+  {id:"apb",t:"Approach brief",i:[["Weather & NOTAM","Reviewed","PF"],["Approach type / rwy","{ldgrwy}","PF"],["Minimum","{mins}","PF"],["VAPP / config","{vapp} · FULL","PF"],["Missed approach","Reviewed","PF"],["Auto brake","{ab}","PF"],["Taxi to stand","Reviewed","PF"]]}
+];
+const MEM=[
+  {id:"m-ed",t:"Emer descent",m:1,i:[["Crew oxy masks","Use","BOTH"],["Signs","On","PM"],["Emer descent","Initiate","PF"]]},
+  {id:"m-us",t:"Unreliable speed",m:1,i:[["AP / FD","Off","PF"],["A/THR","Off","PF"],["PITCH / THRUST","Below THR RED ALT: 15° / TOGA","PF"],["","Above THR RED ALT, below FL100: 10° / CLB","PF"],["","Above FL100: 5° / CLB","PF"],["Flaps","Maintain current config","PF"],["Speedbrakes","Retract","PF"],["L/G","Up","PF"]]},
+  {id:"m-gp",t:"EGPWS pull up",m:1,i:[["AP","Off","PF"],["Pitch","Pull up","PF"],["Thrust levers","TOGA","PF"],["Speedbrakes","Retract","PF"],["Bank","Wings level or adjust","PF"]]},
+  {id:"m-ws",t:"Windshear",m:1,i:[["Thrust levers","TOGA","PF"],["AP (if engaged)","Keep","PF"],["SRS orders","Follow","PF"],["Configuration","Do not change","PF"]]},
+  {id:"m-ra",t:"TCAS RA",m:1,i:[["AP","Off","PF"],["Both FDs","Off","PM"],["Vertical speed","Fly green area","PF"],["ATC","Notify","PM"]]},
+  {id:"m-st",t:"Stall recovery",m:1,i:[["Nose down pitch","Apply","PF"],["Bank","Wings level","PF"],["Thrust","Increase smoothly as needed","PF"],["Speedbrakes","Retract","PF"],["Flight path","Recover smoothly","PF"]]},
+  {id:"m-lb",t:"Loss of braking",m:1,i:[["Reverse","Max","PF"],["Brake pedals","Release","PF"],["A/SKID & N/W STRG","Off","PM"],["Brake pedals","Press","PF"],["Max brk pr","1000 PSI","PF"],["Park brk","Short successive applications","PF"]]}
+];
+const PHASES=["PREFLIGHT","TAXI OUT","AIRBORNE","TAXI IN","ON BLOCKS"];
+
+/* ---------- state ---------- */
+const DEF=()=>({ac:"A359",
+  flight:{no:"BEE1",reg:"HA-BYA",dep:"LHBP",arr:"KJFK",alt:"KEWR",std:"0930",fl:"370",ci:"60",pax:"312",fuel:"78400",zfw:"178200"},
+  perf:{torwy:"31R",flaps:"2",thr:"FLX 52",trim:"UP0.5",v1:"148",vr:"154",v2:"158",ldgrwy:"22L",vapp:"142",mins:"DA 213",ab:"LO",qnh:"1016"},
+  times:{}, cl:{}, clCur:"cp", clEdit:{},
+  flights:[], fltSel:null,
+  wx:{}, wxSel:"LHBP", apSel:"LHBP", apNotes:{},
+  books:[], bookSel:null, theme:"dark", dim:0
+});
+let S;
+try{S=Object.assign(DEF(),JSON.parse(localStorage.getItem("bee.efb")||"null")||{})}catch(e){S=DEF()}
+if(!Array.isArray(S.flights))S.flights=[]; if(!Array.isArray(S.books))S.books=[]; S.clEdit=S.clEdit||{};
+let saveT; const save=()=>{clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem("bee.efb",JSON.stringify(S))}catch(e){}},250)};
+const get=p=>p.split(".").reduce((o,k)=>o?.[k],S);
+const set=(p,v)=>{const ks=p.split(".");let o=S;ks.slice(0,-1).forEach(k=>o=o[k]??={});o[ks.at(-1)]=v;save()};
+
+/* ---------- storage (IndexedDB) ---------- */
+let dbp=null;
+function idb(){return dbp??=new Promise((res,rej)=>{try{const r=indexedDB.open("bee-efb",1);r.onupgradeneeded=()=>{r.result.createObjectStore("c",{keyPath:"id"});r.result.createObjectStore("kv")};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}})}
+const tx=(store,mode,fn)=>idb().then(d=>new Promise((res,rej)=>{const t=d.transaction(store,mode),r=fn(t.objectStore(store));t.oncomplete=()=>res(r&&r.result);t.onerror=()=>rej(t.error)}));
+const kvGet=k=>tx("kv","readonly",s=>s.get(k)).catch(()=>undefined);
+const kvSet=(k,v)=>tx("kv","readwrite",s=>s.put(v,k)).catch(()=>toast("Could not save on this device"));
+const kvDel=k=>tx("kv","readwrite",s=>s.delete(k)).catch(()=>{});
+
+/* ---------- theme / display ---------- */
+function applyTheme(){document.documentElement.setAttribute("data-theme",S.theme);$$("#themeSeg button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.th===S.theme));$("#dimmer").style.opacity=S.dim/100;$("#dimR").value=S.dim}
+$("#themeSeg").onclick=e=>{const b=e.target.closest("button");if(!b)return;S.theme=b.dataset.th;applyTheme();save();drawOSM();DocView.all.forEach(d=>d.repaintInk())};
+$("#dimR").oninput=e=>{S.dim=+e.target.value;applyTheme();save()};
+$("#btnDisp").onclick=e=>{const p=$("#pop");p.hidden=!p.hidden;e.currentTarget.setAttribute("aria-expanded",!p.hidden);e.stopPropagation()};
+document.addEventListener("click",e=>{if(!e.target.closest("#pop,#btnDisp"))$("#pop").hidden=true});
+let resetArm=0;
+$("#resetAll").onclick=e=>{if(Date.now()-resetArm<3000){S.times={};S.cl={};S.clCur="cp";save();renderAll();toast("Flight reset");e.target.textContent="Reset flight";resetArm=0}else{resetArm=Date.now();e.target.textContent="Tap again to confirm"}};
+let wake=null;
+$("#btnWake").onclick=async e=>{const b=e.currentTarget;try{if(wake){await wake.release();wake=null;b.setAttribute("aria-pressed","false");return}wake=await navigator.wakeLock.request("screen");b.setAttribute("aria-pressed","true");toast("Screen stays on");wake.addEventListener("release",()=>{wake=null;b.setAttribute("aria-pressed","false")})}catch(err){toast("Wake lock not available here. Set Auto-Lock to Never.")}};
+
+/* ---------- clocks: UTC and the iPad's own local time ---------- */
+const utcHM=d=>pad2(d.getUTCHours())+":"+pad2(d.getUTCMinutes());
+const tzName=(()=>{try{const p=new Intl.DateTimeFormat("en-GB",{timeZoneName:"short"}).formatToParts(new Date()).find(x=>x.type==="timeZoneName");return p?p.value:""}catch(e){return""}})();
+function tick(){const d=new Date();$("#utc").textContent=utcHM(d)+":"+pad2(d.getUTCSeconds());$("#lcl").textContent=pad2(d.getHours())+":"+pad2(d.getMinutes());
+  const off=-d.getTimezoneOffset();$("#lclZ").textContent="LOCAL "+(tzName&&!/GMT|UTC/.test(tzName)?tzName:"UTC"+(off>=0?"+":"−")+Math.abs(off/60));renderTimes(true)}
+setInterval(tick,1000);
+
+/* ---------- nav ---------- */
+let curView="flight";
+function go(v){curView=v;$$(".view").forEach(s=>s.hidden=s.id!=="v-"+v);$$(".nav").forEach(n=>n.setAttribute("aria-current",n.dataset.v===v?"page":"false"));$("#main").scrollTop=0;try{localStorage.setItem("bee.view",v)}catch(e){}
+  if(v==="charts")renderCharts(); if(v==="check")renderCL(); if(v==="atc")openFlight(); if(v==="notes")openBook(); if(v==="wx")renderWx();
+  requestAnimationFrame(()=>DocView.all.forEach(d=>d.visible()&&d.fitIfResized()))}
+$$(".nav").forEach(n=>n.onclick=()=>go(n.dataset.v));
+document.addEventListener("click",e=>{const g=e.target.closest("[data-go]");if(g)go(g.dataset.go)});
+
+/* ---------- bound fields ---------- */
+function bindFields(){$$("[data-k]").forEach(el=>{el.value=get(el.dataset.k)??"";el.oninput=()=>{let v=el.value;if(el.tagName==="INPUT")v=v.toUpperCase();set(el.dataset.k,v);onField(el.dataset.k)}})}
+function onField(k){if(k.startsWith("flight")){renderHeader();renderRoute();renderWeights()}}
+
+/* ---------- header + flight ---------- */
+function renderHeader(){const f=S.flight;$("#chipNo").textContent=f.no||"—";$("#chipRt").textContent=(f.dep||"····")+" → "+(f.arr||"····");$("#chipAc").textContent=AC[S.ac].name+(f.reg?" · "+f.reg:"");
+  $$("#acSeg button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.ac===S.ac));$("#regs").innerHTML=AC[S.ac].regs.map(r=>`<option value="${r}">`).join("")}
+$("#acSeg").onclick=e=>{const b=e.target.closest("button");if(!b)return;S.ac=b.dataset.ac;save();renderAll()};
+function gc(a,b){const R=3440.065,r=Math.PI/180,dl=(b.lat-a.lat)*r,dn=(b.lon-a.lon)*r,h=Math.sin(dl/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+function renderRoute(){const f=S.flight,A=APT[f.dep],B=APT[f.arr];$("#rDep").textContent=f.dep||"····";$("#rArr").textContent=f.arr||"····";$("#rDepN").textContent=A?A.c:"Not in database";$("#rArrN").textContent=B?B.c:"Not in database";
+  if(A&&B){const d=gc(A,B),m=d/AC[S.ac].tas*60+20;$("#rDist").innerHTML=Math.round(d).toLocaleString()+" <small>NM</small>";$("#rEte").innerHTML=Math.floor(m/60)+"h "+pad2(Math.round(m%60))+" <small>@ "+AC[S.ac].tas+" KT</small>"}else{$("#rDist").textContent="—";$("#rEte").textContent="—"}}
+function renderWeights(){const z=+S.flight.zfw||0,fu=+S.flight.fuel||0,taxi=S.ac==="A359"?800:300,tow=z&&fu?z+fu-taxi:0;$("#f-tow").value=tow||"";const w=$("#wtWarn");
+  if(tow>MTOW[S.ac]){w.style.color="var(--red)";w.textContent=`TOW ${tow.toLocaleString()} kg exceeds MTOW ${MTOW[S.ac].toLocaleString()} kg.`}else{w.style.color="";w.textContent=tow?`TOW assumes ${taxi} kg taxi fuel. Margin to MTOW: ${(MTOW[S.ac]-tow).toLocaleString()} kg.`:""}}
+
+const OO=[["out","OUT","Off blocks"],["off","OFF","Takeoff"],["on","ON","Landing"],["in","IN","On blocks"]];
+function hm(ms){if(ms==null||ms<0)return"--:--";const m=Math.floor(ms/60000);return pad2(Math.floor(m/60))+":"+pad2(m%60)}
+function renderOOO(){const t=S.times;let nx=OO.findIndex(o=>!t[o[0]]);$("#ooo").innerHTML=OO.map((o,i)=>`<button class="oo ${t[o[0]]?"set":""} ${i===nx?"next":""}" data-o="${o[0]}"><span class="k">${o[1]}</span><span class="v">${t[o[0]]?utcHM(new Date(t[o[0]]))+"Z":"--:--"}</span><span class="note">${t[o[0]]?"Tap to clear":i===nx?"Tap to stamp "+o[2].toLowerCase():o[2]}</span></button>`).join("");
+  const ph=nx<0?4:nx;$("#rPhase").textContent=PHASES[ph];$("#rDot").setAttribute("cx",[4,40,200,370,396][ph]);$("#rDot").setAttribute("cy",[32,24,9,24,32][ph]);renderTimes()}
+function renderTimes(live){const t=S.times,now=Date.now();if(live&&!t.out)return;
+  $("#tBlock").textContent=t.out?hm((t.in||now)-t.out):"--:--";$("#tAir").textContent=t.off?hm((t.on||now)-t.off):"--:--";
+  if(!live){const s=(S.flight.std||"").replace(":","");if(t.out&&/^\d{4}$/.test(s)){const d=new Date(t.out),std=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate(),+s.slice(0,2),+s.slice(2));let diff=Math.round((t.out-std)/60000);if(diff>720)diff-=1440;if(diff<-720)diff+=1440;$("#tDelay").innerHTML=`<span style="color:${diff>15?"var(--amber)":"var(--green)"}">${diff>=0?"+":""}${diff} <small>MIN</small></span>`}else $("#tDelay").textContent="—"}}
+$("#ooo").onclick=e=>{const b=e.target.closest(".oo");if(!b)return;const k=b.dataset.o;if(S.times[k])delete S.times[k];else S.times[k]=Date.now();save();renderOOO();
+  if(S.times[k]){S.clCur={out:"as",off:"at",on:"al",in:"pk"}[k];toast(k.toUpperCase()+" "+utcHM(new Date())+"Z")}};
+$("#ooReset").onclick=()=>{S.times={};save();renderOOO()};
+let chr={run:false,t0:0,acc:0,h:0};
+function chrShow(){const ms=chr.acc+(chr.run?Date.now()-chr.t0:0),s=ms/1000;$("#chrV").textContent=pad2(Math.floor(s/60))+":"+pad2(Math.floor(s%60))+"."+Math.floor((ms%1000)/100)}
+$("#chrGo").onclick=e=>{if(chr.run){chr.acc+=Date.now()-chr.t0;chr.run=false;clearInterval(chr.h);e.target.textContent="Start"}else{chr.t0=Date.now();chr.run=true;chr.h=setInterval(chrShow,100);e.target.textContent="Stop"}chrShow()};
+$("#chrRst").onclick=()=>{chr.acc=0;chr.t0=Date.now();chrShow()};
+
+/* ---------- checklists ---------- */
+let clEditing=false;
+const baseNormals=()=>S.ac==="A359"?CL_A359:CL_A21N;
+const withEdits=list=>list.map(c=>{const e=S.clEdit[S.ac+":"+c.id];return e?{...c,i:e,edited:true}:c});
+const normals=()=>withEdits(baseNormals());
+const allCL=()=>[...normals(),...withEdits(BRIEF),...MEM];
+const clKey=id=>S.ac+":"+id;
+const clState=c=>S.cl[clKey(c.id)]||[];
+const clDone=c=>c.i.every((_,i)=>clState(c)[i]);
+function fill(r){const p=S.perf,f=S.flight,q=getWx(f.dep).m?.qnh;const v={fuel:f.fuel?(+f.fuel).toLocaleString():"___",qnhdep:q||"___",qnh:p.qnh||"___",v1:p.v1||"V1",vr:p.vr||"VR",v2:p.v2||"V2",thr:p.thr||"",trim:p.trim||"___",flaps:p.flaps||"___",torwy:p.torwy||"___",ldgrwy:p.ldgrwy||"___",mins:p.mins||"___",ab:p.ab||"As rqrd",vapp:p.vapp||"VAPP",pb:"___",ai:"As rqrd",ems:"As rqrd",packs:"As rqrd",extlt:"As rqrd",pbc:"As rqrd"};return r.replace(/\{(\w+)\}/g,(_,k)=>v[k]??"")}
+function renderCL(){const all=allCL(),cur=all.find(c=>c.id===S.clCur)||normals()[0];S.clCur=cur.id;
+  const grp=(name,list)=>`<div class="cl-group">${name}</div>`+list.map(c=>{const n=clState(c).filter(Boolean).length;return`<button class="cl-it ${clDone(c)?"done":""}" data-c="${c.id}" aria-current="${c.id===cur.id}"><span class="dot"></span>${esc(c.t)}<span class="n">${n}/${c.i.length}</span></button>`}).join("");
+  $("#clList").innerHTML=grp("Normal · "+AC[S.ac].name,normals())+grp("Briefings",withEdits(BRIEF))+grp("Memory items",MEM);
+  const st=clState(cur),nx=cur.i.findIndex((_,i)=>!st[i]),editable=!cur.m;
+  let body;
+  if(clEditing&&editable){body=`<div>${cur.i.map((it,i)=>`<div class="ce" data-i="${i}"><input value="${esc(it[0])}" data-f="0" aria-label="Challenge"><input value="${esc(it[1])}" data-f="1" aria-label="Response"><select data-f="2" aria-label="Who">${["PF","PM","BOTH","CM1","CM2"].map(w=>`<option ${w===it[2]?"selected":""}>${w}</option>`).join("")}</select><button class="tool" data-del="${i}" aria-label="Remove item"><svg><use href="#i-x"/></svg></button></div>`).join("")}</div>
+    <div class="ecl-f"><button class="btn sm" id="ceAdd">Add item</button><button class="btn sm ghost" id="ceRestore">Restore Airbus default</button><span class="spacer"></span><button class="btn pri" id="ceDone">Done</button></div>`}
+  else body=`<div>${cur.i.map((it,i)=>`<button class="ci ${st[i]?"ok":""} ${i===nx?"cur":""} ${cur.m?"mem":""}" data-i="${i}"><span class="box"><svg viewBox="0 0 24 24"><use href="#i-tick"/></svg></span><span class="ch">${esc(it[0])}</span><span class="lead"></span><span class="rs">${esc(fill(it[1]))}${it[3]?`<span class="sub">${esc(it[3])}</span>`:""}</span><span class="who">${it[2]}</span></button>`).join("")}</div>
+   <div class="ecl-f">${nx<0?`<span class="complete">${esc(cur.t)} checklist complete</span><span class="spacer"></span>${nextCL(cur)?`<button class="btn pri" id="clNext">${esc(nextCL(cur).t)} ›</button>`:""}`:`<span class="note">${cur.i.length-st.filter(Boolean).length} items remaining</span><span class="spacer"></span><button class="btn" id="clAll">Check all</button>`}</div>`;
+  $("#ecl").innerHTML=(cur.m?`<div class="warnstrip">Memory items · recall first, then confirm with QRH</div>`:"")+
+   `<div class="ecl-h"><h2>${esc(cur.t)}</h2><span class="tag">${cur.m?"Memory items":cur.edited?"Bee Airlines edited":BRIEF.some(b=>b.id===cur.id)?"Briefing":AC[S.ac].name+" · Airbus NCL"}</span><span class="spacer"></span>${editable&&!clEditing?`<button class="btn sm ghost" id="clEdit">Edit</button>`:""}<button class="btn sm ghost" id="clReset">Reset</button></div>`+body;
+  $("#clSub").textContent=`${AC[S.ac].name} normal checklist in the Airbus NCL layout. Tap to confirm; tap Edit to match your company checklist word for word.`;
+  renderCLProg()}
+function nextCL(c){const l=normals(),i=l.findIndex(x=>x.id===c.id);return i>=0&&i<l.length-1?l[i+1]:null}
+$("#clList").onclick=e=>{const b=e.target.closest(".cl-it");if(b){S.clCur=b.dataset.c;clEditing=false;save();renderCL()}};
+function editItems(){const cur=allCL().find(c=>c.id===S.clCur);return S.clEdit[clKey(cur.id)]??=cur.i.map(x=>[...x])}
+$("#ecl").addEventListener("input",e=>{const row=e.target.closest(".ce");if(!row)return;const it=editItems()[+row.dataset.i];it[+e.target.dataset.f]=e.target.value.toUpperCase();save()});
+$("#ecl").onclick=e=>{const cur=allCL().find(c=>c.id===S.clCur),k=clKey(cur.id);const it=e.target.closest(".ci");
+  if(it){const a=S.cl[k]=S.cl[k]||[];a[+it.dataset.i]=!a[+it.dataset.i];save();renderCL();return}
+  if(e.target.closest("#clEdit")){clEditing=true;renderCL()}
+  if(e.target.closest("#ceDone")){clEditing=false;renderCL()}
+  if(e.target.closest("#ceAdd")){editItems().push(["NEW ITEM","CHECKED","PF"]);delete S.cl[k];save();renderCL()}
+  const d=e.target.closest("[data-del]");if(d){editItems().splice(+d.dataset.del,1);delete S.cl[k];save();renderCL()}
+  if(e.target.closest("#ceRestore")){delete S.clEdit[k];delete S.cl[k];save();renderCL()}
+  if(e.target.closest("#clReset")){delete S.cl[k];save();renderCL()}
+  if(e.target.closest("#clAll")){S.cl[k]=cur.i.map(()=>true);save();renderCL()}
+  if(e.target.closest("#clNext")){S.clCur=nextCL(cur).id;save();renderCL();$("#main").scrollTop=0}};
+function renderCLProg(){$("#clProg").innerHTML=normals().map(c=>{const n=clState(c).filter(Boolean).length;return`<button class="clp ${clDone(c)?"done":""}" data-cl="${c.id}"><span>${esc(c.t)}</span><i><b style="width:${n/c.i.length*100}%"></b></i></button>`}).join("");
+  const left=normals().filter(c=>!clDone(c)).length,bd=$("#clBadge");bd.hidden=!left;bd.textContent=left}
+$("#clProg").onclick=e=>{const b=e.target.closest(".clp");if(b){S.clCur=b.dataset.cl;save();go("check")}};
+
+/* ---------- METAR decode ---------- */
+function parseMetar(raw){if(!raw)return null;const t=raw.trim().toUpperCase().split(/\s+/),m={raw:raw.trim(),clouds:[],wx:[]};let i=0;
+  if(t[i]==="METAR"||t[i]==="SPECI")i++;m.icao=t[i++];if(/^\d{6}Z$/.test(t[i]))m.time=t[i++];if(t[i]==="AUTO"||t[i]==="COR")i++;
+  for(;i<t.length;i++){const x=t[i];let r;
+    if(x==="NOSIG"||x==="TEMPO"||x==="BECMG"||x==="RMK")break;
+    if((r=x.match(/^(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?(KT|MPS)$/))){const k=r[4]==="MPS"?1.944:1;m.wdir=r[1]==="VRB"?null:+r[1];m.wspd=Math.round(+r[2]*k);m.gust=r[3]?Math.round(+r[3]*k):null;m.vrb=r[1]==="VRB"}
+    else if(/^\d{3}V\d{3}$/.test(x))m.wvar=x.replace("V","–");
+    else if(x==="CAVOK"){m.cavok=true;m.vis=10000}
+    else if(/^\d{4}$/.test(x)&&m.vis==null)m.vis=+x;
+    else if((r=x.match(/^(P?)(\d+)(?:\/(\d+))?SM$/))){const sm=r[3]?+r[2]/+r[3]:+r[2];m.vis=Math.round(sm*1609);m.visSM=sm}
+    else if(/^\d$/.test(x)&&/^\d\/\dSM$/.test(t[i+1]||"")){const [a,b]=t[i+1].replace("SM","").split("/");m.visSM=+x+a/b;m.vis=Math.round(m.visSM*1609);i++}
+    else if((r=x.match(/^(FEW|SCT|BKN|OVC|VV)(\d{3})(CB|TCU)?$/)))m.clouds.push({c:r[1],h:+r[2]*100,t:r[3]||""});
+    else if(/^(NSC|SKC|CLR|NCD)$/.test(x))m.nsc=true;
+    else if((r=x.match(/^(M?\d{2})\/(M?\d{2})?$/))){m.temp=+r[1].replace("M","-");if(r[2])m.dew=+r[2].replace("M","-")}
+    else if((r=x.match(/^Q(\d{4})$/))){m.qnh=+r[1];m.inhg=(m.qnh*0.02953).toFixed(2)}
+    else if((r=x.match(/^A(\d{4})$/))){m.inhg=(+r[1]/100).toFixed(2);m.qnh=Math.round(+r[1]/100/0.02953)}
+    else if(/^(\+|-|VC)?(MI|BC|PR|DR|BL|SH|TS|FZ)?(DZ|RA|SN|SG|IC|PL|GR|GS|UP|BR|FG|FU|VA|DU|SA|HZ|PO|SQ|FC|SS|DS)+$/.test(x)||/^(\+|-)?TS$/.test(x))m.wx.push(x)}
+  const ceil=m.clouds.filter(c=>/BKN|OVC|VV/.test(c.c)).map(c=>c.h)[0];m.ceil=ceil??null;const vsm=m.vis!=null?m.vis/1609:99,cl=ceil??99999;
+  m.cat=cl<500||vsm<1?"LIFR":cl<1000||vsm<3?"IFR":cl<=3000||vsm<=5?"MVFR":"VFR";return m}
+const WXW={RA:"rain",SN:"snow",DZ:"drizzle",BR:"mist",FG:"fog",HZ:"haze",TS:"thunderstorm",SH:"showers",FZ:"freezing",GR:"hail",DU:"dust",SA:"sand",SQ:"squalls"};
+const wxWords=c=>c.replace(/^(\+|-|VC)/,s=>({"+":"heavy ","-":"light ",VC:"vicinity "}[s])).replace(/TS|SH|FZ|RA|SN|DZ|BR|FG|HZ|GR|DU|SA|SQ/g,k=>WXW[k]+" ").trim();
+function comps(rh,wd,ws){const a=(wd-rh)*Math.PI/180;return{h:Math.round(ws*Math.cos(a)),x:Math.round(ws*Math.sin(a))}}
+function rwyEnds(ap){const out=[];ap.rwy.forEach(r=>{const [a,b]=r.id.split("/");out.push({id:a,len:r.len});if(b)out.push({id:b,len:r.len})});return out}
+function windRows(ap,m){if(!ap)return{html:`<tr><td class="t">Airport not in database.</td></tr>`,best:null};const ends=rwyEnds(ap);
+  if(!m||m.wspd==null)return{html:`<tr><th>Rwy</th><th>Length</th></tr>`+ends.map(e=>`<tr><td>${e.id}</td><td>${e.len} m</td></tr>`).join(""),best:null};
+  const ws=m.gust||m.wspd;const rows=ends.map(e=>{const h=+e.id.slice(0,2)*10,c=m.vrb?{h:0,x:m.wspd}:comps(h,m.wdir,m.wspd),g=m.vrb?{x:ws}:comps(h,m.wdir,ws);return{...e,...c,gx:g.x}});
+  const best=rows.reduce((a,b)=>b.h>a.h?b:a),lim=AC[S.ac].xw;
+  return{best,html:`<tr><th>Rwy</th><th>Head</th><th>Cross</th></tr>`+rows.map(r=>`<tr class="${r===best?"best":""}"><td><b>${r.id}</b></td><td class="${r.h>=0?"hw":"tw"}">${r.h>=0?"▼ "+r.h:"▲ "+-r.h} kt</td><td class="${Math.abs(r.gx)>lim?"tw":Math.abs(r.x)>15?"xw":""}">${Math.abs(r.x)}${m.gust?"/"+Math.abs(r.gx):""} kt ${r.x>0?"R":r.x<0?"L":""}</td></tr>`).join("")}}
+
+/* ---------- weather ---------- */
+function wxChipsList(){const f=S.flight;const tagged=[[f.dep,"DEP"],[f.arr,"ARR"],[f.alt,"ALTN"]].filter(x=>x[0]);return[...tagged,...Object.keys(APT).filter(k=>!tagged.some(t=>t[0]===k)).map(k=>[k,""])]}
+function getWx(k){const w=S.wx[k];if(w&&w.metar)return{metar:w.metar,taf:w.taf,m:parseMetar(w.metar),src:w.src,t:w.t};return{}}
+function renderWxChips(){$("#wxChips").innerHTML=wxChipsList().map(([k,t])=>{const m=getWx(k).m;return`<button class="apc" data-ap="${k}" aria-pressed="${k===S.wxSel}">${k}${t?` <small>${t}</small>`:""}${m?` <span class="pill c-${m.cat.toLowerCase()}" style="height:20px;font-size:11px">${m.cat}</span>`:""}</button>`}).join("")}
+$("#wxChips").onclick=e=>{const b=e.target.closest(".apc");if(b){S.wxSel=b.dataset.ap;save();renderWx();fetchWx(b.dataset.ap,true)}};
+function ageTxt(t){const m=Math.round((Date.now()-t)/60000);return m<1?"just now":m<60?m+" min ago":Math.floor(m/60)+" h "+m%60+" min ago"}
+function renderWx(){renderWxChips();const k=S.wxSel,w=getWx(k),m=w.m,ap=APT[k];$("#wxIcao").value=k;$("#wxTitle").textContent="METAR "+k;
+  $("#wxLive").classList.toggle("on",w.src==="live");
+  $("#wxStat").textContent=w.src?`${w.src==="live"?"Live":"Pasted"} · received ${ageTxt(w.t)}${m?.time?" · issued "+m.time.slice(2,4)+":"+m.time.slice(4,6)+"Z":""}`:"No weather yet for "+k;
+  $("#wxMetar").textContent=w.metar||"No report loaded. Tap Get live weather, or paste one above.";$("#wxTaf").textContent=w.taf||"—";
+  $("#wxCat").innerHTML=m?`<span class="pill c-${m.cat.toLowerCase()}">${m.cat}</span>`:"";
+  if(m){const vis=m.cavok?"CAVOK":m.vis==null?"—":m.visSM!=null?m.visSM+" SM":m.vis>=9999?"10 km+":m.vis>=5000?(m.vis/1000)+" km":m.vis+" m";
+    const t=[["Wind",m.wspd==null?"—":m.vrb?`VRB ${m.wspd} kt`:`${String(m.wdir).padStart(3,"0")}° / ${m.wspd}${m.gust?"G"+m.gust:""} kt`,m.wvar?"Varying "+m.wvar:m.gust?"Gusting":"Steady"],
+      ["Visibility",vis,m.wx.length?m.wx.map(wxWords).join(", "):"No significant weather"],
+      ["Cloud",m.cavok?"CAVOK":m.nsc?"NSC":m.clouds.length?m.clouds.map(c=>c.c+" "+c.h+c.t).join(" · "):"—",m.ceil!=null?"Ceiling "+m.ceil+" ft":"No ceiling"],
+      ["QNH",m.qnh?m.qnh+" hPa":"—",m.inhg?m.inhg+" inHg":""],
+      ["Temp / dew",m.temp!=null?`${m.temp}° / ${m.dew??"—"}°`:"—",m.temp!=null&&m.dew!=null?`Spread ${m.temp-m.dew}°${m.temp-m.dew<=2?" · fog risk":""}`:""],
+      ["Category",m.cat,{VFR:"Visual",MVFR:"Marginal VFR",IFR:"Instrument",LIFR:"Low IFR"}[m.cat]],
+      ["Icing",m.temp!=null&&m.temp<=10&&(m.wx.length||m.ceil!=null)?"Possible":"Unlikely",m.temp!=null&&m.temp<=10?"OAT ≤ 10° with visible moisture: engine anti-ice":"Engine anti-ice not expected"],
+      ["Elevation",ap?ap.elev+" ft":"—",ap?ap.n:""]];
+    $("#wxTiles").innerHTML=t.map(x=>`<div class="wt"><span class="lbl">${x[0]}</span><span class="v ${x[0]==="Category"?"c-"+m.cat.toLowerCase():""}">${esc(x[1])}</span><span class="s">${esc(x[2])}</span></div>`).join("")}else $("#wxTiles").innerHTML="";
+  const wr=windRows(ap,m);$("#wxRwy").innerHTML=wr.html;$("#wxXwNote").textContent=wr.best?`Best aligned: RWY ${wr.best.id}. ${AC[S.ac].name} demonstrated crosswind ${AC[S.ac].xw} kt. Runway numbers are magnetic, METAR wind is true.`:"";drawRose(m,ap)}
+function drawRose(m,ap){let h=`<circle cx="75" cy="75" r="66" fill="none" stroke="var(--line-2)" stroke-width="1.5"/>`;
+  for(let d=0;d<360;d+=30){const a=d*Math.PI/180,r1=d%90?60:56;h+=`<line x1="${75+r1*Math.sin(a)}" y1="${75-r1*Math.cos(a)}" x2="${75+66*Math.sin(a)}" y2="${75-66*Math.cos(a)}" stroke="var(--dim)" stroke-width="${d%90?1:2}"/>`}
+  h+=`<text x="75" y="22" text-anchor="middle" font-size="12" fill="var(--muted)" font-family="Barlow Condensed">N</text>`;
+  if(ap)ap.rwy.forEach(r=>{const a=r.h*Math.PI/180;h+=`<line x1="${75-40*Math.sin(a)}" y1="${75+40*Math.cos(a)}" x2="${75+40*Math.sin(a)}" y2="${75-40*Math.cos(a)}" stroke="var(--rwy)" stroke-width="9"/>`});
+  if(m&&m.wdir!=null){const a=m.wdir*Math.PI/180,x0=75+62*Math.sin(a),y0=75-62*Math.cos(a),x1=75+14*Math.sin(a),y1=75-14*Math.cos(a);h+=`<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="var(--cyan)" stroke-width="3.5"/><polygon points="${x1},${y1} ${x1+9*Math.sin(a+0.5)},${y1-9*Math.cos(a+0.5)} ${x1+9*Math.sin(a-0.5)},${y1-9*Math.cos(a-0.5)}" fill="var(--cyan)"/>`}
+  h+=`<text x="75" y="80" text-anchor="middle" font-size="15" font-weight="600" fill="var(--fg)" font-family="JetBrains Mono">${m&&m.wspd!=null?m.wspd+(m.gust?"G"+m.gust:""):""}</text>`;$("#rose").innerHTML=h}
+$("#wxDecode").onclick=()=>{const lines=$("#wxRaw").value.trim().toUpperCase().split(/\n+/);if(!lines[0]){toast("Paste a METAR first");return}const m=parseMetar(lines[0]);const k=m.icao&&/^[A-Z]{4}$/.test(m.icao)?m.icao:S.wxSel;
+  S.wx[k]={metar:lines[0],taf:lines.slice(1).join(" "),src:"pasted",t:Date.now()};S.wxSel=k;save();renderWx();toast("Decoded "+k)};
+/* Live METAR from the VATSIM METAR service, which mirrors real-world NOAA reports and allows browser access. */
+async function fetchWx(k,quiet){if(!/^[A-Z]{4}$/.test(k)){if(!quiet)toast("Enter a 4-letter ICAO code");return false}
+  try{const c=new AbortController();setTimeout(()=>c.abort(),7000);const r=await fetch(`https://metar.vatsim.net/${k}`,{signal:c.signal,cache:"no-store"});const tx=(await r.text()).trim();if(!r.ok||!/^[A-Z]{4}\s\d{6}Z/.test(tx))throw new Error("no report");
+    const old=S.wx[k]||{};S.wx[k]={metar:tx.split("\n")[0],taf:old.taf||"",src:"live",t:Date.now()};save();if(curView==="wx")renderWx();return true}
+  catch(e){if(!quiet){S.wxSel=k;save();renderWx();$("#wxStat").textContent="Could not reach live weather from this page. Paste the METAR instead."}return false}}
+$("#wxFetch").onclick=async()=>{const k=$("#wxIcao").value.trim().toUpperCase();S.wxSel=k;$("#wxStat").textContent="Fetching "+k+"…";if(await fetchWx(k))toast("Live METAR "+k)};
+async function refreshAllWx(){let ok=0;for(const [k] of wxChipsList().slice(0,3))if(await fetchWx(k,true))ok++;if(ok&&curView==="wx")renderWx()}
+
+/* ---------- ink engine (Apple Pencil) ---------- */
+const INK={tool:"pen",color:"ink",size:2,finger:false};
+const INKCOL={ink:["#14202c","fg"],blue:["#1257c9","cyan"],red:["#d42a2a","red"],green:["#11884f","green"],honey:["#e2a300","honey"]};
+const inkColor=(c,paper)=>paper==="light"?INKCOL[c][0]:cssVar(INKCOL[c][1]);
+function inkBar(){return`<div class="inkbar">
+  <button class="tool" data-tool="pen" title="Pen"><svg><use href="#i-pen"/></svg></button>
+  <button class="tool" data-tool="hl" title="Highlighter"><svg><use href="#i-hl"/></svg></button>
+  <button class="tool" data-tool="erase" title="Eraser"><svg><use href="#i-er"/></svg></button>
+  <span class="sep"></span>
+  ${Object.keys(INKCOL).map(c=>`<button class="sw" data-col="${c}" aria-label="${c} ink" style="background:${INKCOL[c][0]}"></button>`).join("")}
+  <span class="sep"></span>
+  <button class="tool" data-size="1">Fine</button><button class="tool" data-size="2">Med</button><button class="tool" data-size="3.5">Bold</button>
+  <span class="sep"></span>
+  <button class="tool" data-act="undo" title="Undo"><svg><use href="#i-undo"/></svg></button>
+  <button class="tool" data-act="finger" title="Draw with finger"><svg><use href="#i-hand"/></svg>Finger</button>
+  <button class="tool" data-act="zout" aria-label="Zoom out">−</button><button class="tool" data-act="zin" aria-label="Zoom in">+</button>
+  <button class="tool" data-act="night" title="Dark pages">Night</button>
+  <button class="tool" data-act="focus" title="Full screen"><svg><use href="#i-full"/></svg></button>
+  <span class="spacer"></span><span class="note" data-role="status"></span>
+</div>`}
+function syncInkBars(){$$(".inkbar [data-tool]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tool===INK.tool));$$(".inkbar [data-col]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.col===INK.color));
+  $$(".inkbar [data-size]").forEach(b=>b.setAttribute("aria-pressed",+b.dataset.size===INK.size));$$(".inkbar [data-act=finger]").forEach(b=>b.setAttribute("aria-pressed",INK.finger));$$(".inkbar [data-act=focus]").forEach(b=>b.setAttribute("aria-pressed",$("#app").classList.contains("focus")))}
+
+class DocView{
+  static all=[];
+  constructor(host){this.host=host;this.zoom=1;this.pages=[];this.data={pages:{}};this.hist=[];DocView.all.push(this);
+    host.innerHTML=inkBar()+`<div class="docpages"><div class="docin"></div></div>`;this.sc=host.querySelector(".docpages");this.inner=host.querySelector(".docin");this.status=host.querySelector("[data-role=status]");
+    host.querySelector(".inkbar").addEventListener("click",e=>this.onBar(e));this.pinch();syncInkBars()}
+  visible(){return this.host.offsetParent!==null}
+  onBar(e){const b=e.target.closest("button");if(!b)return;
+    if(b.dataset.tool){INK.tool=b.dataset.tool}else if(b.dataset.col){INK.color=b.dataset.col;if(INK.tool==="erase")INK.tool="pen"}else if(b.dataset.size){INK.size=+b.dataset.size}
+    else{const a=b.dataset.act;if(a==="undo")this.undo();if(a==="finger"){INK.finger=!INK.finger;toast(INK.finger?"Finger draws. Scroll with two fingers.":"Pencil draws, finger scrolls")}
+      if(a==="zin")this.setZoom(this.zoom*1.25);if(a==="zout")this.setZoom(this.zoom/1.25);
+      if(a==="night"){const on=!this.sc.classList.contains("night");this.sc.classList.toggle("night",on);b.setAttribute("aria-pressed",on);this.repaintInk()}
+      if(a==="focus"){$("#app").classList.toggle("focus");setTimeout(()=>DocView.all.forEach(d=>d.visible()&&d.layout()),60)}}
+    syncInkBars()}
+  /* source: {kind:"pdf",doc} | {kind:"img",url} | {kind:"paper",count,pattern} */
+  async load(source,key,paper){this.source=source;this.key=key;this.paper=paper;this.hist=[];this.zoom=1;this.data=(await kvGet(key))||{pages:{}};this.data.pages=this.data.pages||{};await this.layout()}
+  clear(html){this.source=null;this.key=null;this.pages=[];this.inner.style.transform="";this.inner.innerHTML=html||""}
+  pageSizes=async()=>{const s=this.source;if(s.kind==="pdf"){const out=[];for(let p=1;p<=s.doc.numPages;p++){const pg=await s.doc.getPage(p);const v=pg.getViewport({scale:1});out.push({w:v.width,h:v.height,pg})}return out}
+    if(s.kind==="img"){const im=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=s.url});return[{w:im.naturalWidth,h:im.naturalHeight,im}]}
+    return Array.from({length:s.count},()=>({w:1000,h:1414}))}
+  fitIfResized(){if(this.source&&this.lastW!==this.sc.clientWidth)this.layout()}
+  async layout(){if(!this.source||!this.visible())return;const my=this.gen=(this.gen||0)+1;this.lastW=this.sc.clientWidth;const W=Math.max(200,(this.sc.clientWidth-28)*this.zoom),dpr=Math.min(window.devicePixelRatio||1,2);
+    const sizes=await this.pageSizes();if(my!==this.gen)return;const frag=document.createDocumentFragment();const pages=[];
+    for(let i=0;i<sizes.length;i++){const z=sizes[i],H=W*z.h/z.w;const d=document.createElement("div");d.className="pg";d.style.width=W+"px";d.style.height=H+"px";
+      const base=document.createElement("canvas");base.className="base";const ink=document.createElement("canvas");ink.className="ink";
+      let s=dpr;if(W*s>4096)s=4096/W;[base,ink].forEach(c=>{c.width=Math.round(W*s);c.height=Math.round(H*s);c.style.width=W+"px";c.style.height=H+"px"});
+      d.append(base,ink);d.insertAdjacentHTML("beforeend",`<span class="pno">${i+1}/${sizes.length}</span>`);frag.appendChild(d);pages.push({d,base,ink,W,H,s,i,z})}
+    this.inner.style.transform="";this.inner.innerHTML="";this.inner.appendChild(frag);this.pages=pages;
+    pages.forEach(p=>{this.paintInk(p);this.bindInk(p)});
+    for(const p of pages){if(my!==this.gen)return;await this.paintBase(p)}}
+  async paintBase(p){const c=p.base.getContext("2d"),src=this.source;c.setTransform(p.s,0,0,p.s,0,0);
+    if(src.kind==="pdf"){const v0=p.z.pg.getViewport({scale:1});const vp=p.z.pg.getViewport({scale:p.W/v0.width*p.s});c.setTransform(1,0,0,1,0,0);await p.z.pg.render({canvasContext:c,viewport:vp}).promise}
+    else if(src.kind==="img"){c.drawImage(p.z.im,0,0,p.W,p.H)}
+    else{c.fillStyle=cssVar("paper");c.fillRect(0,0,p.W,p.H);const u=p.W/1000;c.strokeStyle=cssVar("paper-line");c.lineWidth=1;
+      if(src.pattern==="lines"){c.beginPath();for(let y=140*u;y<p.H-40*u;y+=40*u){c.moveTo(50*u,y);c.lineTo(p.W-50*u,y)}c.stroke();c.strokeStyle=cssVar("red");c.globalAlpha=.35;c.beginPath();c.moveTo(110*u,0);c.lineTo(110*u,p.H);c.stroke();c.globalAlpha=1}
+      else if(src.pattern==="grid"){c.beginPath();for(let x=0;x<p.W;x+=33*u){c.moveTo(x,0);c.lineTo(x,p.H)}for(let y=0;y<p.H;y+=33*u){c.moveTo(0,y);c.lineTo(p.W,y)}c.stroke()}
+      p.d.style.background=cssVar("paper")}}
+  strokes(i){return this.data.pages[i]??=[]}
+  inkPaper(){return this.paper==="light"&&!this.sc.classList.contains("night")?"light":"theme"}
+  drawStroke(c,p,st){const u=p.W/1000,pts=st.p,paper=this.inkPaper();c.lineCap="round";c.lineJoin="round";c.strokeStyle=inkColor(st.c,paper);
+    if(st.t==="hl"){c.globalAlpha=.32;c.lineWidth=st.w*7*u;c.beginPath();c.moveTo(pts[0]*u,pts[1]*u);for(let k=3;k<pts.length;k+=3)c.lineTo(pts[k]*u,pts[k+1]*u);c.stroke();c.globalAlpha=1;return}
+    if(pts.length<6){c.fillStyle=c.strokeStyle;c.beginPath();c.arc(pts[0]*u,pts[1]*u,st.w*.9*u,0,7);c.fill();return}
+    for(let k=3;k<pts.length;k+=3){c.lineWidth=st.w*u*(.45+pts[k+2]*1.3);c.beginPath();c.moveTo(pts[k-3]*u,pts[k-2]*u);c.lineTo(pts[k]*u,pts[k+1]*u);c.stroke()}}
+  paintInk(p){const c=p.ink.getContext("2d");c.setTransform(p.s,0,0,p.s,0,0);c.clearRect(0,0,p.W,p.H);this.strokes(p.i).forEach(st=>this.drawStroke(c,p,st))}
+  repaintInk(){this.pages.forEach(p=>this.paintInk(p))}
+  bindInk(p){const cv=p.ink;let cur=null;const u=()=>p.W/1000;
+    const pt=e=>{const r=cv.getBoundingClientRect(),k=p.W/r.width;return[+((e.clientX-r.left)*k/u()).toFixed(1),+((e.clientY-r.top)*k/u()).toFixed(1)]};
+    const stylusOrFinger=ev=>INK.finger||[...ev.touches].some(t=>t.touchType==="stylus");
+    cv.addEventListener("touchstart",ev=>{if(ev.touches.length===1&&stylusOrFinger(ev))ev.preventDefault()},{passive:false});
+    cv.addEventListener("touchmove",ev=>{if(cur&&ev.touches.length===1)ev.preventDefault()},{passive:false});
+    cv.addEventListener("pointerdown",e=>{if(e.pointerType==="touch"&&!INK.finger)return;if(!e.isPrimary)return;e.preventDefault();cv.setPointerCapture(e.pointerId);
+      const [x,y]=pt(e);if(INK.tool==="erase"){cur={erase:true};this.eraseAt(p,x,y);return}
+      cur={t:INK.tool==="hl"?"hl":"pen",c:INK.color,w:INK.size,p:[x,y,e.pointerType==="pen"?e.pressure||.5:.5]};});
+    cv.addEventListener("pointermove",e=>{if(!cur)return;const evs=e.getCoalescedEvents?e.getCoalescedEvents():[e];
+      if(cur.erase){evs.forEach(ev=>{const [x,y]=pt(ev);this.eraseAt(p,x,y)});return}
+      const n0=cur.p.length;evs.forEach(ev=>{const [x,y]=pt(ev);cur.p.push(x,y,ev.pointerType==="pen"?ev.pressure||.5:.5)});
+      const c=p.ink.getContext("2d");if(cur.t==="hl"){this.paintInk(p);this.drawStroke(c,p,cur)}else this.drawStroke(c,p,{...cur,p:cur.p.slice(Math.max(0,n0-3))})});
+    const end=()=>{if(!cur)return;if(!cur.erase&&cur.p){this.strokes(p.i).push(cur);this.hist.push({op:"add",i:p.i,st:cur});if(cur.t==="hl"||cur.p.length<6)this.paintInk(p);this.persist()}cur=null};
+    cv.addEventListener("pointerup",end);cv.addEventListener("pointercancel",end)}
+  eraseAt(p,x,y){const arr=this.strokes(p.i),R=12;let hit=false;for(let j=arr.length-1;j>=0;j--){const q=arr[j].p;for(let k=0;k<q.length;k+=3){if(Math.abs(q[k]-x)<R&&Math.abs(q[k+1]-y)<R){this.hist.push({op:"del",i:p.i,st:arr[j],at:j});arr.splice(j,1);hit=true;break}}}if(hit){this.paintInk(p);this.persist()}}
+  undo(){const h=this.hist.pop();if(!h){toast("Nothing to undo");return}const arr=this.strokes(h.i);if(h.op==="add"){const j=arr.lastIndexOf(h.st);if(j>=0)arr.splice(j,1)}else arr.splice(h.at,0,h.st);const p=this.pages[h.i];if(p)this.paintInk(p);this.persist()}
+  persist(){if(!this.key)return;clearTimeout(this.pt);this.status.textContent="Saving…";this.pt=setTimeout(async()=>{await kvSet(this.key,this.data);this.status.textContent="Saved "+utcHM(new Date())+"Z";this.onSave&&this.onSave()},400)}
+  setZoom(z){const prev=this.zoom;this.zoom=Math.max(.6,Math.min(4,z));if(!this.source)return;this.inner.style.transform=`scale(${this.zoom/prev})`;clearTimeout(this.zt);this.zt=setTimeout(()=>this.layout(),220)}
+  pinch(){const sc=this.sc;let d0=0,z0=1;const dist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+    sc.addEventListener("touchstart",e=>{if(e.touches.length===2){d0=dist(e.touches);z0=this.zoom}},{passive:true});
+    sc.addEventListener("touchmove",e=>{if(e.touches.length===2&&d0){e.preventDefault();const z=Math.max(.6,Math.min(4,z0*dist(e.touches)/d0));this.inner.style.transform=`scale(${z/this.zoom})`;this.pz=z}},{passive:false});
+    sc.addEventListener("touchend",e=>{if(d0&&e.touches.length<2){d0=0;if(this.pz){const z=this.pz;this.pz=0;this.zoom=z;this.layout()}}})}
+}
+
+/* ---------- ATC flight notes ---------- */
+const atcView=new DocView($("#atcDoc"));atcView.paper="light";
+let tplDoc=null;
+async function loadTemplate(){if(tplDoc)return tplDoc;
+  const stored=await kvGet("tpl");let blob=stored?.blob,name=stored?.name;
+  if(!blob){try{const r=await fetch("atc-notes.pdf");if(r.ok){blob=await r.blob();name="ATC_Flight_Notes.pdf"}}catch(e){}}
+  if(!blob)return null;
+  if(/^image\//.test(blob.type)){tplDoc={kind:"img",url:URL.createObjectURL(blob),name};return tplDoc}
+  if(!window.pdfjsLib)return null;
+  try{const doc=await pdfjsLib.getDocument({data:await blob.arrayBuffer()}).promise;tplDoc={kind:"pdf",doc,name};return tplDoc}catch(e){return null}}
+function fltLabel(f){return`${f.no||"—"} ${f.dep||"····"}–${f.arr||"····"}`}
+function renderFlights(){const list=[...S.flights].sort((a,b)=>b.d-a.d);
+  $("#fltList").innerHTML=list.length?list.map(f=>`<div class="chit" role="button" tabindex="0" data-id="${f.id}" aria-current="${f.id===S.fltSel}"><span class="nm">${esc(fltLabel(f))}<small>${esc(f.ac||"")} · ${new Date(f.d).toISOString().slice(0,10)} · ${utcHM(new Date(f.d))}Z${f.reg?" · "+esc(f.reg):""}</small></span><button class="x" data-del="${f.id}" aria-label="Delete flight"><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button></div>`).join(""):`<div class="note">No flights saved yet. Tap New flight to start a fresh notes sheet.</div>`}
+async function openFlight(){renderFlights();const t=await loadTemplate();
+  $("#tplInfo").textContent=t?`Using ${t.name||"your sheet"}. Each new flight gets a clean copy.`:"No notes sheet loaded yet.";
+  if(!t){atcView.clear(`<div class="empty"><svg viewBox="0 0 32 32"><use href="#i-atc"/></svg><b>Load your ATC flight notes PDF</b><span>Pick ATC_Flight_Notes.pdf from Files once. Every new flight then opens a clean copy you can write on.</span><label class="btn pri" for="tplFile">Choose PDF</label></div>`);return}
+  const f=S.flights.find(x=>x.id===S.fltSel);
+  if(!f){atcView.clear(`<div class="empty"><svg viewBox="0 0 32 32"><use href="#i-atc"/></svg><b>Start a flight</b><span>New flight opens a clean ATC notes sheet for ${esc(fltLabel(S.flight))}.</span><button class="btn pri" onclick="newFlight()">New flight</button></div>`);return}
+  if(atcView.key!=="ink:flt:"+f.id||atcView.source!==t)await atcView.load(t,"ink:flt:"+f.id,"light")}
+function newFlight(){const fl=S.flight,f={id:Date.now(),no:fl.no,dep:fl.dep,arr:fl.arr,reg:fl.reg,ac:AC[S.ac].name,d:Date.now()};S.flights.push(f);S.fltSel=f.id;save();atcView.key=null;go("atc");toast("New notes sheet for "+fltLabel(f))}
+$("#fltNew").onclick=newFlight;
+$("#fltList").onclick=async e=>{const d=e.target.closest("[data-del]");if(d){e.stopPropagation();if(d.dataset.arm){const id=+d.dataset.del;S.flights=S.flights.filter(f=>f.id!==id);kvDel("ink:flt:"+id);if(S.fltSel===id){S.fltSel=null;atcView.key=null}save();openFlight()}else{d.dataset.arm=1;d.style.color="var(--red)";toast("Tap × again to delete this flight");setTimeout(()=>{delete d.dataset.arm;d.style.color=""},2500)}return}
+  const it=e.target.closest(".chit");if(it){S.fltSel=+it.dataset.id;save();openFlight()}};
+$("#tplFile").onchange=async e=>{const f=e.target.files[0];if(!f)return;await kvSet("tpl",{blob:f,name:f.name});tplDoc=null;atcView.key=null;e.target.value="";toast("Notes sheet saved on this iPad");if(!S.fltSel&&!S.flights.length)newFlight();else openFlight()};
+
+/* ---------- Notes: handwriting notebooks ---------- */
+const noteView=new DocView($("#noteDoc"));
+function curBook(){return S.books.find(b=>b.id===S.bookSel)}
+function renderBooks(){$("#nList").innerHTML=[...S.books].sort((a,b)=>b.d-a.d).map(b=>`<button class="chit" data-id="${b.id}" aria-current="${b.id===S.bookSel}"><span class="nm">${esc(b.t||"Untitled")}<small>${new Date(b.d).toISOString().slice(0,16).replace("T"," ")}Z · ${b.pages} page${b.pages>1?"s":""}</small></span></button>`).join("");
+  const b=curBook();$("#nTitle").value=b?b.t:"";$$("#nPaper button").forEach(x=>x.setAttribute("aria-pressed",b&&x.dataset.p===b.paper))}
+async function openBook(force){if(!S.books.length){const b={id:Date.now(),t:"Crew notes",paper:"lines",pages:2,d:Date.now()};S.books.push(b);S.bookSel=b.id;save()}
+  if(!curBook())S.bookSel=S.books[0].id;renderBooks();const b=curBook();
+  if(force||noteView.key!=="ink:note:"+b.id)await noteView.load({kind:"paper",count:b.pages,pattern:b.paper},"ink:note:"+b.id,"theme")}
+noteView.onSave=()=>{const b=curBook();if(b){b.d=Date.now();save()}};
+$("#nNew").onclick=()=>{const b={id:Date.now(),t:(S.flight.no||"Notes")+" "+new Date().toISOString().slice(5,10),paper:"lines",pages:2,d:Date.now()};S.books.push(b);S.bookSel=b.id;save();openBook(true)};
+$("#nList").onclick=e=>{const it=e.target.closest(".chit");if(it){S.bookSel=+it.dataset.id;save();openBook()}};
+$("#nTitle").oninput=e=>{const b=curBook();if(b){b.t=e.target.value;save();clearTimeout(renderBooks.t);renderBooks.t=setTimeout(()=>{const a=document.activeElement;renderBooks();a.focus()},700)}};
+$("#nPaper").onclick=e=>{const x=e.target.closest("button"),b=curBook();if(!x||!b)return;b.paper=x.dataset.p;save();openBook(true)};
+$("#nAddPg").onclick=async()=>{const b=curBook();if(!b)return;b.pages++;save();await openBook(true);noteView.sc.scrollTop=noteView.sc.scrollHeight};
+let delArm=0;$("#nDel").onclick=e=>{if(Date.now()-delArm<3000){const b=curBook();S.books=S.books.filter(x=>x!==b);kvDel("ink:note:"+b.id);S.bookSel=S.books[0]?.id;save();openBook(true);e.target.textContent="Delete";delArm=0}else{delArm=Date.now();e.target.textContent="Confirm";setTimeout(()=>e.target.textContent="Delete",3000)}};
+
+/* ---------- charts ---------- */
+let chTab="diag";
+const chartView=new DocView($("#chartDoc"));chartView.paper="light";
+function renderApChips(){const f=S.flight;const tag=k=>k===f.dep?"DEP":k===f.arr?"ARR":k===f.alt?"ALTN":"";$("#apChips").innerHTML=Object.keys(APT).map(k=>`<button class="apc" data-ap="${k}" aria-pressed="${k===S.apSel}">${k}${tag(k)?` <small>${tag(k)}</small>`:""}</button>`).join("")}
+$("#apChips").onclick=e=>{const b=e.target.closest(".apc");if(b){S.apSel=b.dataset.ap;save();osmZoom=1;chartView.clear();openChartId=null;renderCharts()}};
+$("#chTabs").onclick=e=>{const b=e.target.closest("button");if(!b)return;chTab=b.dataset.t;renderCharts()};
+function renderCharts(){renderApChips();const ap=APT[S.apSel];$$("#chTabs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.t===chTab));["diag","info","mine"].forEach(t=>$("#ch-"+t).hidden=t!==chTab);
+  $("#apElev").textContent=`${ap.n} · ${S.apSel}/${ap.iata} · Elevation ${ap.elev} ft`;
+  const m=getWx(S.apSel).m,wr=windRows(ap,m);$("#rwyWind").innerHTML=wr.html;$("#rwyWindNote").textContent=m?`Wind ${m.vrb?"VRB":m.wdir+"°"} / ${m.wspd}${m.gust?"G"+m.gust:""} kt from ${getWx(S.apSel).src} METAR.`:"Load weather to see wind components.";
+  $("#apFreq").innerHTML=`<tr><th>Station</th><th>MHz</th></tr>`+ap.frq.map(f=>`<tr><td class="t">${f[0]}</td><td>${f[1]}</td></tr>`).join("");
+  $("#apRwy").innerHTML=`<tr><th>Rwy</th><th>Length</th><th>Width</th></tr>`+ap.rwy.map(r=>`<tr><td><b>${r.id}</b></td><td>${r.len} m · ${Math.round(r.len*3.281).toLocaleString()} ft</td><td>${r.w} m</td></tr>`).join("");
+  $("#apNote").value=S.apNotes[S.apSel]??ap.note;if(!getWx(S.apSel).src||Date.now()-getWx(S.apSel).t>6e5){const k=S.apSel;fetchWx(k,true).then(ok=>{if(ok&&curView==="charts"&&S.apSel===k)renderCharts()})}$("#chFor").textContent=S.apSel;
+  $("#chSrc").innerHTML=ap.src.map(s=>`<a href="${s[1]}" target="_blank" rel="noopener">${esc(s[0])} ↗</a>`).join("")+`<span class="note">Download the PDF there, then Import it here. Charts stay on this iPad and you can write on them.</span>`;
+  if(chTab==="diag")requestAnimationFrame(drawOSM);if(chTab==="mine"){listCharts();if(!openChartId)chartView.clear(`<div class="empty"><svg viewBox="0 0 32 32"><use href="#i-chart"/></svg><b>Official charts for ${S.apSel}</b><span>Import the aerodrome chart, SIDs, STARs and approaches from the official AIP. Then pick one on the left.</span></div>`)}}
+$("#apNote").oninput=e=>{S.apNotes[S.apSel]=e.target.value;save()};
+
+/* OSM ground layout */
+let osmZoom=1,osmShow={st:true,hp:true};
+function rwyEndLabels(ref,pts){const parts=String(ref).split("/");if(parts.length<2)return[parts[0],""];const dx=pts[pts.length-2]-pts[0],dy=pts[pts.length-1]-pts[1];const brg=(Math.atan2(dx,dy)*180/Math.PI+360)%360;const n=parseInt(parts[0])*10;const diff=Math.abs(((brg-n+540)%360)-180);return diff<45?[parts[0],parts[1]]:[parts[1],parts[0]]}
+function drawOSM(){const box=$("#osm");if(!box||$("#ch-diag").hidden)return;const o=window.OSM_APT?.[S.apSel];
+  if(!o){box.innerHTML=`<div class="empty"><b>Ground layout not loaded</b><span>The airport layout file did not load. Check the connection and reopen the page.</span></div>`;return}
+  let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;const ext=a=>{for(let k=0;k<a.length;k+=2){x0=Math.min(x0,a[k]);x1=Math.max(x1,a[k]);y0=Math.min(y0,a[k+1]);y1=Math.max(y1,a[k+1])}};
+  o.rw.forEach(r=>ext(r[3]));o.tw.forEach(t=>ext(t[1]));const pad=450;x0-=pad;x1+=pad;y0-=pad;y1+=pad;
+  const bw=x1-x0,bh=y1-y0,W=Math.max(300,Math.min(box.clientWidth-2,(box.clientHeight-2)*bw/bh)*osmZoom),H=W*bh/bw,mpp=bw/W;
+  const P=a=>{let s="";for(let k=0;k<a.length;k+=2)s+=(k?"L":"M")+a[k]+" "+(-a[k+1]);return s};
+  const m=getWx(S.apSel).m,best=windRows(APT[S.apSel],m).best;
+  let h=`<svg width="${W}" height="${H}" viewBox="${x0} ${-y1} ${bw} ${bh}" role="img" aria-label="${S.apSel} ground layout">`;
+  h+=o.ap.map(a=>`<path d="${P(a)}Z" fill="var(--panel-2)" stroke="var(--line)" stroke-width="${mpp}"/>`).join("");
+  h+=o.te.map(a=>`<path d="${P(a)}Z" fill="var(--bldg)"/>`).join("");
+  const twW=Math.max(18,mpp*5);
+  h+=`<g fill="none" stroke-linecap="round" stroke-linejoin="round">`+o.tw.map(t=>`<path d="${P(t[1])}" stroke="var(--twy)" stroke-width="${twW}"/>`).join("")+o.tw.map(t=>`<path d="${P(t[1])}" stroke="var(--twy-cl)" stroke-width="${Math.max(1.2,mpp*1.1)}" opacity=".8"/>`).join("")+`</g>`;
+  o.rw.forEach(r=>{const w=Math.max(r[1]||45,mpp*9);if(r[2])h+=`<path d="${P(r[3])}Z" fill="var(--rwy)"/>`;else h+=`<path d="${P(r[3])}" stroke="var(--rwy)" stroke-width="${w}" fill="none"/><path d="${P(r[3])}" stroke="var(--rwy-mark)" stroke-width="${Math.max(1,mpp*1.2)}" stroke-dasharray="${36} ${24}" fill="none" opacity=".85"/>`});
+  const fs=13*mpp,lab=[];
+  o.rw.forEach(r=>{if(r[2])return;const p=r[3],[a,b]=rwyEndLabels(r[0],p);const ends=[[p[0],p[1],p[2],p[3],a],[p[p.length-2],p[p.length-1],p[p.length-4],p[p.length-3],b]];
+    ends.forEach(([x,y,nx,ny,id])=>{if(!id)return;const dx=x-nx,dy=y-ny,L=Math.hypot(dx,dy)||1,lx=x+dx/L*fs*3,ly=y+dy/L*fs*3,on=best&&best.id===id;
+      lab.push(`<g><rect x="${lx-fs*2.1}" y="${-ly-fs*1.1}" width="${fs*4.2}" height="${fs*2.2}" rx="${fs*.4}" fill="${on?"var(--green)":"var(--panel)"}" stroke="${on?"var(--green)":"var(--line-2)"}" stroke-width="${mpp}"/><text x="${lx}" y="${-ly+fs*.45}" text-anchor="middle" font-size="${fs*1.3}" font-family="JetBrains Mono" font-weight="600" fill="${on?"var(--bg)":"var(--fg)"}">${esc(id)}</text></g>`)})});
+  const seen={};o.tw.map(t=>{const a=t[1];let L=0;for(let k=2;k<a.length;k+=2)L+=Math.hypot(a[k]-a[k-2],a[k+1]-a[k-1]);return{ref:String(t[0]).replace(/^Taxiway\s+/i,""),a,L}}).filter(t=>t.ref&&t.L>mpp*60).sort((a,b)=>b.L-a.L).forEach(t=>{
+    seen[t.ref]=(seen[t.ref]||0)+1;if(seen[t.ref]>Math.max(1,Math.round(t.L/(mpp*500))+ (seen[t.ref]>1?0:1)))return;
+    let acc=0,half=t.L/2,x=t.a[0],y=t.a[1];for(let k=2;k<t.a.length;k+=2){const s=Math.hypot(t.a[k]-t.a[k-2],t.a[k+1]-t.a[k-1]);if(acc+s>=half){const f=(half-acc)/s;x=t.a[k-2]+(t.a[k]-t.a[k-2])*f;y=t.a[k-1]+(t.a[k+1]-t.a[k-1])*f;break}acc+=s}
+    const w=fs*(1+t.ref.length*.62);lab.push(`<g class="lbl-tw"><rect x="${x-w/2}" y="${-y-fs*.8}" width="${w}" height="${fs*1.6}" rx="${fs*.2}"/><text x="${x}" y="${-y+fs*.45}" text-anchor="middle" font-size="${fs*1.15}">${esc(t.ref)}</text></g>`)});
+  if(osmShow.hp&&osmZoom>=1.5)o.hp.forEach(([r,x,y])=>lab.push(`<g class="lbl-hp"><circle cx="${x}" cy="${-y}" r="${fs*.35}" fill="var(--red)"/><text x="${x+fs*.6}" y="${-y-fs*.5}" font-size="${fs*.95}">${esc(r)}</text></g>`));
+  if(osmShow.st&&osmZoom>=3)o.st.forEach(([r,x,y])=>lab.push(`<g class="lbl-st"><text x="${x}" y="${-y+fs*.3}" text-anchor="middle" font-size="${fs*.8}">${esc(r)}</text></g>`));
+  h+=lab.join("");
+  if(m&&m.wdir!=null){const cx=x0+fs*5,cy=-y1+fs*5,r=fs*3.2;h+=`<g transform="translate(${cx},${cy})"><circle r="${r}" fill="var(--panel)" stroke="var(--line-2)" stroke-width="${mpp}"/><g transform="rotate(${m.wdir})"><line x1="0" y1="${-r*.8}" x2="0" y2="${r*.4}" stroke="var(--cyan)" stroke-width="${fs*.3}"/><path d="M0 ${r*.75}L${-r*.25} ${r*.3}H${r*.25}z" fill="var(--cyan)"/></g><text y="${r+fs*1.4}" text-anchor="middle" font-size="${fs*1.1}" font-family="JetBrains Mono" font-weight="600" fill="var(--cyan)">${String(m.wdir).padStart(3,"0")}/${m.wspd}${m.gust?"G"+m.gust:""}</text></g>`}
+  h+=`<g transform="translate(${x1-fs*4},${-y1+fs*4})"><circle r="${fs*2.4}" fill="var(--panel)" stroke="var(--line-2)" stroke-width="${mpp}"/><path d="M0 ${-fs*1.8}L${fs*.7} ${fs*.7} 0 ${fs*.2} ${-fs*.7} ${fs*.7}z" fill="var(--honey)"/></g>`;
+  h+=`</svg>`;const cxr=(box.scrollLeft+box.clientWidth/2)/(box.scrollWidth||1),cyr=(box.scrollTop+box.clientHeight/2)/(box.scrollHeight||1);box.innerHTML=h;
+  box.scrollLeft=cxr*box.scrollWidth-box.clientWidth/2;box.scrollTop=cyr*box.scrollHeight-box.clientHeight/2;$("#osmZ").textContent=Math.round(osmZoom*100)+"%";
+  $("#osmStands").setAttribute("aria-pressed",osmShow.st);$("#osmHold").setAttribute("aria-pressed",osmShow.hp)}
+function osmSet(z){osmZoom=Math.max(1,Math.min(8,z));drawOSM()}
+$("#osmIn").onclick=()=>osmSet(osmZoom*1.4);$("#osmOut").onclick=()=>osmSet(osmZoom/1.4);$("#osmFit").onclick=()=>osmSet(1);
+$("#osmStands").onclick=()=>{osmShow.st=!osmShow.st;if(osmShow.st&&osmZoom<3)osmZoom=3;drawOSM()};$("#osmHold").onclick=()=>{osmShow.hp=!osmShow.hp;if(osmShow.hp&&osmZoom<1.5)osmZoom=1.5;drawOSM()};
+(()=>{const box=$("#osm");let d0=0,z0=1,pz=0;const dist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+  box.addEventListener("touchstart",e=>{if(e.touches.length===2){d0=dist(e.touches);z0=osmZoom}},{passive:true});
+  box.addEventListener("touchmove",e=>{if(e.touches.length===2&&d0){e.preventDefault();pz=Math.max(1,Math.min(8,z0*dist(e.touches)/d0));const sv=box.querySelector("svg");if(sv){sv.style.transformOrigin="0 0";sv.style.transform=`scale(${pz/osmZoom})`}}},{passive:false});
+  box.addEventListener("touchend",e=>{if(d0&&e.touches.length<2){d0=0;if(pz){osmSet(pz);pz=0}}})})();
+$("#osmFind").oninput=e=>{const q=e.target.value.trim().toUpperCase(),o=window.OSM_APT?.[S.apSel];if(!q||!o){$("#osmFindRes").textContent="";return}
+  let hit=o.tw.find(t=>String(t[0]).toUpperCase()===q),pt=null;if(hit)pt=[hit[1][Math.floor(hit[1].length/4)*2],hit[1][Math.floor(hit[1].length/4)*2+1]];
+  if(!pt){const s=o.st.find(s=>String(s[0]).toUpperCase()===q)||o.hp.find(s=>String(s[0]).toUpperCase()===q);if(s){pt=[s[1],s[2]];if(osmZoom<2.5)osmZoom=2.5;osmShow.st=true}}
+  if(!pt){$("#osmFindRes").textContent="No taxiway, stand or holding point named "+q;return}
+  if(osmZoom<2.5)osmZoom=2.5;drawOSM();const box=$("#osm"),sv=box.querySelector("svg"),vb=sv.viewBox.baseVal,k=sv.width.baseVal.value/vb.width;
+  box.scrollLeft=(pt[0]-vb.x)*k-box.clientWidth/2;box.scrollTop=(-pt[1]-vb.y)*k-box.clientHeight/2;$("#osmFindRes").textContent="Centred on "+q};
+
+/* imported official charts */
+let openChartId=null;
+async function listCharts(){let all=[];try{all=await tx("c","readonly",s=>s.getAll())}catch(e){$("#chList").innerHTML=`<div class="note">Storage is unavailable in this browser window.</div>`;return}
+  const mine=all.filter(c=>c.icao===S.apSel).sort((a,b)=>a.cat.localeCompare(b.cat)||a.name.localeCompare(b.name));
+  $("#chList").innerHTML=mine.length?mine.map(c=>`<div class="chit" role="button" tabindex="0" data-id="${c.id}" aria-current="${c.id===openChartId}"><span class="cat">${c.cat}</span><span class="nm">${esc(c.name)}</span><button class="x" data-del="${c.id}" aria-label="Remove chart"><svg viewBox="0 0 24 24"><use href="#i-x"/></svg></button></div>`).join(""):`<div class="note">No charts imported for ${S.apSel} yet.</div>`}
+$("#impFile").onchange=async e=>{const files=[...e.target.files];for(const f of files){try{await tx("c","readwrite",s=>s.put({id:Date.now()+"-"+Math.random().toString(36).slice(2,7),icao:S.apSel,cat:$("#impCat").value,name:f.name.replace(/\.[^.]+$/,""),type:f.type,blob:f,added:Date.now()}))}catch(err){toast("Could not store "+f.name)}}e.target.value="";listCharts();if(files.length)toast(files.length+" chart"+(files.length>1?"s":"")+" added to "+S.apSel)};
+$("#chList").onclick=async e=>{const d=e.target.closest("[data-del]");if(d){e.stopPropagation();if(d.dataset.arm){await tx("c","readwrite",s=>s.delete(d.dataset.del));kvDel("ink:chart:"+d.dataset.del);if(openChartId===d.dataset.del){openChartId=null;renderCharts()}listCharts()}else{d.dataset.arm=1;d.style.color="var(--red)";toast("Tap × again to remove");setTimeout(()=>{delete d.dataset.arm;d.style.color=""},2500)}return}
+  const it=e.target.closest(".chit");if(!it)return;const c=await tx("c","readonly",s=>s.get(it.dataset.id));if(!c)return;openChartId=c.id;listCharts();
+  try{let src;if(c.type==="application/pdf"){if(!window.pdfjsLib)throw new Error("PDF viewer did not load. Check the connection.");src={kind:"pdf",doc:await pdfjsLib.getDocument({data:await c.blob.arrayBuffer()}).promise}}else src={kind:"img",url:URL.createObjectURL(c.blob)};
+    await chartView.load(src,"ink:chart:"+c.id,"light")}catch(err){chartView.clear(`<div class="empty"><b>This chart could not be opened.</b><span>${esc(err.message||"")}</span></div>`)}};
+
+/* ---------- perf tools ---------- */
+function renderPerf(){const a=AC[S.ac];$("#limType").textContent=a.name;$("#perfSub").textContent=`${a.name} reference data and quick calculators.`;$("#lim").innerHTML=a.lim.map(l=>`<div><span>${l[0]}</span><b>${l[1]}</b></div>`).join("")}
+const num=id=>parseFloat($(id).value)||0;
+function calcX(){const c=comps(num("#x-rw"),num("#x-wd"),num("#x-ws"));$("#x-h").innerHTML=`${Math.abs(c.h)} kt<small>${c.h>=0?"Headwind":"Tailwind"}</small>`;$("#x-h").style.color=c.h<0?"var(--red)":"";$("#x-x").innerHTML=`${Math.abs(c.x)} kt<small>Crosswind ${c.x>0?"from right":c.x<0?"from left":""}</small>`;$("#x-x").style.color=Math.abs(c.x)>AC[S.ac].xw?"var(--red)":""}
+function calcD(){const dh=num("#d-fl")*100-num("#d-to");$("#d-d").innerHTML=`${Math.round(Math.max(0,dh/1000*3))} NM<small>Top of descent (3° rule)</small>`;$("#d-v").innerHTML=`${Math.round(num("#d-gs")*5/100)*100} fpm<small>For 3° path at this GS</small>`}
+function calcU(){const kg=num("#u-kg"),sg=num("#u-sg")||.8;$("#u-l").innerHTML=`${Math.round(kg/sg).toLocaleString()} L<small>Volume</small>`;$("#u-lb").innerHTML=`${Math.round(kg*2.20462).toLocaleString()} lb<small>Mass</small>`}
+function calcK(){const h=num("#k-h"),t=num("#k-t"),e=num("#k-e");const isa=15-e*0.00198;const corr=t<isa?h*(isa-t)/(273+t-0.5*0.0065*h*0.3048):0;$("#k-r").innerHTML=`+${Math.ceil(corr/10)*10} ft<small>Add to minimum altitudes (ICAO simplified). Round up per SOP.</small>`}
+["#x-rw","#x-wd","#x-ws"].forEach(i=>$(i).oninput=calcX);["#d-fl","#d-to","#d-gs"].forEach(i=>$(i).oninput=calcD);["#u-kg","#u-sg"].forEach(i=>$(i).oninput=calcU);["#k-h","#k-t","#k-e"].forEach(i=>$(i).oninput=calcK);
+$("#p-hpa").oninput=()=>$("#p-in").value=(num("#p-hpa")*0.02953).toFixed(2);$("#p-in").oninput=()=>$("#p-hpa").value=Math.round(num("#p-in")/0.02953);
+$("#t-c").oninput=()=>$("#t-f").value=Math.round(num("#t-c")*9/5+32);$("#t-f").oninput=()=>$("#t-c").value=Math.round((num("#t-f")-32)*5/9);
+$("#a-ft").oninput=()=>$("#a-m").value=Math.round(num("#a-ft")*0.3048);$("#a-m").oninput=()=>$("#a-ft").value=Math.round(num("#a-m")/0.3048);
+
+/* ---------- boot ---------- */
+function renderAll(){bindFields();renderHeader();renderRoute();renderWeights();renderOOO();renderCLProg();renderCL();renderPerf();calcX();calcD();calcU();calcK();renderWxChips()}
+window.addEventListener("resize",()=>{clearTimeout(window.rz);window.rz=setTimeout(()=>{if(curView==="charts")drawOSM();DocView.all.forEach(d=>d.visible()&&d.fitIfResized())},200)});
+applyTheme();renderAll();tick();chrShow();
+let v0="flight";try{v0=localStorage.getItem("bee.view")||"flight"}catch(e){}if(location.hash&&$("#v-"+location.hash.slice(1)))v0=location.hash.slice(1);go(v0);
+refreshAllWx();setInterval(refreshAllWx,15*60000);
+/* offline support when hosted as its own website */
+if("serviceWorker" in navigator&&/^https:$/.test(location.protocol)&&!/claude\.ai|claudeusercontent/.test(location.hostname))navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body>
+</html>
